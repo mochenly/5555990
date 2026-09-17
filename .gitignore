@@ -1,0 +1,7 @@
+.kilo/
+matrix.json
+prototype.html
+.env
+.env.*
+node_modules/
+*.log

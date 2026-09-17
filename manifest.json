@@ -1,0 +1,12 @@
+{
+  "display_name": "Mnema",
+  "description": "Tracks narrative events and compresses completed story arcs into long-term memory.",
+  "loading_order": 112,
+  "requires": [],
+  "optional": [],
+  "js": "index.js",
+  "css": "style.css",
+  "author": "fawn",
+  "version": "0.8.0",
+  "auto_update": false
+}

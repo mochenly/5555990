@@ -1,0 +1,1623 @@
+body.mnema-popup-open { overflow: hidden; }
+
+.mnema-popup {
+    --mnema-text: var(--SmartThemeBodyColor, #eee);
+    --mnema-muted: var(--SmartThemeEmColor, #aaa);
+    --mnema-accent: var(--SmartThemeQuoteColor, #b8b8df);
+    --mnema-border: color-mix(in srgb, var(--SmartThemeBorderColor, #777) 48%, transparent);
+    --mnema-border-soft: color-mix(in srgb, var(--SmartThemeBodyColor, #eee) 10%, transparent);
+    --mnema-surface: color-mix(in srgb, var(--SmartThemeBlurTintColor, #202226) 88%, transparent);
+    --mnema-sidebar: color-mix(in srgb, var(--SmartThemeChatTintColor, #111) 35%, transparent);
+    --mnema-glass: color-mix(in srgb, var(--SmartThemeBodyColor, #eee) 5%, transparent);
+    --mnema-glass-hover: color-mix(in srgb, var(--SmartThemeBodyColor, #eee) 9%, transparent);
+    position: fixed;
+    z-index: 100000;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    color: var(--mnema-text);
+    background: color-mix(in srgb, var(--SmartThemeShadowColor, #000) 70%, transparent);
+    backdrop-filter: blur(8px);
+}
+
+.mnema-popup[hidden],
+#mnema_profile_fields[hidden],
+#mnema_manual_fields[hidden],
+.mnema-disclosure-body[hidden],
+.mnema-tab-btn[hidden],
+.mnema-sidebar-label[hidden],
+.mnema-tab-badge[hidden] { display: none !important; }
+
+.mnema-popup *, .mnema-popup *::before, .mnema-popup *::after { box-sizing: border-box; }
+
+.mnema-popup-card {
+    display: flex;
+    flex-direction: column;
+    width: min(920px, 96vw);
+    height: min(680px, 88vh);
+    min-height: 520px;
+    overflow: hidden;
+    color: var(--mnema-text);
+    background: var(--mnema-surface);
+    border: 1px solid var(--mnema-border);
+    border-radius: 20px;
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--mnema-text) 10%, transparent), 0 28px 72px -12px var(--SmartThemeShadowColor, #000);
+    backdrop-filter: blur(calc(var(--SmartThemeBlurStrength, 10px) + 12px)) saturate(150%);
+}
+
+.mnema-popup-header {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 12px;
+    min-height: 48px;
+    padding: 8px 12px 8px 18px;
+    border-bottom: 1px solid var(--mnema-border-soft);
+}
+
+.mnema-popup-header h3 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.mnema-header-status-dot {
+    width: 8px;
+    height: 8px;
+    flex: 0 0 auto;
+    background: #6ccf91;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #6ccf9188;
+}
+
+.mnema-header-status-dot.busy { background: #d7b85f; animation: mnema-pulse 1s ease-in-out infinite alternate; }
+.mnema-header-status-dot.off { background: var(--mnema-muted); box-shadow: none; }
+
+.mnema-tab-title span { color: var(--mnema-accent); }
+.mnema-header-actions { display: flex; align-items: center; gap: 6px; }
+
+.mnema-header-actions button, .mnema-arc-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-width: 30px;
+    height: 30px;
+    margin: 0;
+    padding: 0 10px;
+    color: var(--mnema-muted);
+    background: transparent;
+    border: 1px solid var(--mnema-border-soft);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: 160ms ease;
+}
+
+.mnema-header-actions button:hover, .mnema-arc-toggle:hover {
+    color: var(--mnema-text);
+    background: var(--mnema-glass-hover);
+    border-color: var(--mnema-border);
+}
+
+.mnema-header-actions button:disabled { cursor: default; opacity: 0.4; }
+.mnema-widget-body { display: flex; flex: 1; min-height: 0; }
+
+.mnema-sidebar {
+    display: flex;
+    flex: 0 0 224px;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 8px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: var(--mnema-sidebar);
+    border-right: 1px solid var(--mnema-border-soft);
+    scrollbar-width: thin;
+}
+
+.mnema-sidebar-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 11px 13px 4px;
+    color: var(--mnema-muted);
+    font-size: 9px;
+    letter-spacing: 1.8px;
+    opacity: 0.58;
+    text-transform: uppercase;
+}
+
+.mnema-sidebar-label::before { content: '───'; font-size: 7px; letter-spacing: 0; }
+
+.mnema-tab-btn {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    min-height: 38px;
+    margin: 1px 0;
+    padding: 8px 11px;
+    color: var(--mnema-muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    font: inherit;
+    font-size: 12.5px;
+    text-align: left;
+    cursor: pointer;
+    transition: 180ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.mnema-tab-btn i { width: 18px; flex: 0 0 18px; font-size: 13px; text-align: center; }
+.mnema-tab-ornament { width: 7px; color: var(--mnema-accent); font-size: 7px; opacity: 0; transition: opacity 180ms ease; }
+
+.mnema-tab-btn:hover {
+    color: var(--mnema-text);
+    background: var(--mnema-glass);
+    border-color: var(--mnema-border-soft);
+}
+
+.mnema-tab-btn.active {
+    color: var(--mnema-text);
+    background: var(--mnema-glass-hover);
+    border-color: var(--mnema-border);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--mnema-text) 8%, transparent), 0 3px 10px -4px var(--SmartThemeShadowColor, #000);
+}
+
+.mnema-tab-btn.active .mnema-tab-ornament { opacity: 0.65; }
+
+.mnema-tab-badge {
+    min-width: 18px;
+    margin-left: auto;
+    padding: 1px 6px;
+    color: var(--SmartThemeBlurTintColor, #111);
+    background: var(--mnema-accent);
+    border-radius: 9px;
+    font-size: 10px;
+    line-height: 1.45;
+    text-align: center;
+}
+
+.mnema-tab-badge.critical { color: #fff; background: #c95f62; }
+
+.mnema-popup-content {
+    flex: 1;
+    min-width: 0;
+    padding: 30px 36px;
+    overflow-y: auto;
+    box-shadow: inset 18px 0 24px -26px var(--SmartThemeShadowColor, #000);
+    scrollbar-width: thin;
+}
+
+.mnema-tab-panel { display: none; }
+.mnema-tab-panel.active { display: block; animation: mnema-fade-in 180ms ease; }
+@keyframes mnema-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+.mnema-tab-title {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 0 0 24px;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.35px;
+}
+
+.mnema-glass-card, .mnema-note, .mnema-arc {
+    color: var(--mnema-text);
+    background: var(--mnema-glass);
+    border: 1px solid var(--mnema-border-soft);
+    border-radius: 15px;
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--mnema-text) 7%, transparent), 0 4px 12px -7px var(--SmartThemeShadowColor, #000);
+    transition: 220ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.mnema-note:hover, .mnema-arc:hover {
+    background: var(--mnema-glass-hover);
+    border-color: var(--mnema-border);
+    transform: translateY(-1px);
+}
+
+.mnema-status-line {
+    margin: 0 2px 16px;
+    color: var(--mnema-muted);
+    font-size: 11px;
+    letter-spacing: 0.3px;
+}
+
+.mnema-status-line strong { color: var(--mnema-text); font-weight: 500; }
+
+.mnema-scene-strip {
+    display: flex;
+    margin: 16px 0;
+    background: var(--mnema-glass);
+    border: 1px solid var(--mnema-border-soft);
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.mnema-scene-cell {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 12px 14px;
+    position: relative;
+}
+
+.mnema-scene-cell[hidden] { display: none !important; }
+
+.mnema-scene-cell + .mnema-scene-cell::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 10px; bottom: 10px;
+    width: 1px;
+    background: var(--mnema-border-soft);
+}
+
+.mnema-scene-cell small { color: var(--mnema-muted); font-size: 9px; letter-spacing: 1.4px; text-transform: uppercase; opacity: 0.7; }
+.mnema-scene-cell strong { font-size: 13px; font-weight: 500; color: var(--mnema-text); }
+.mnema-scene-cell span { font-size: 10px; color: var(--mnema-muted); }
+
+.mnema-overview-char { padding: 16px 18px; margin-bottom: 16px; }
+.mnema-overview-char-head { display: flex; align-items: center; gap: 9px; margin-bottom: 12px; }
+.mnema-overview-char-head i { color: var(--mnema-accent); font-size: 13px; opacity: 0.7; }
+.mnema-overview-char-head strong { font-size: 13px; font-weight: 500; }
+.mnema-overview-char-head span { color: var(--mnema-muted); font-size: 11px; margin-left: auto; }
+
+.mnema-overview-vitals { display: flex; flex-direction: column; gap: 8px; }
+.mnema-overview-vital { display: flex; align-items: center; gap: 10px; }
+.mnema-overview-vital small { flex: 0 0 56px; color: var(--mnema-muted); font-size: 10.5px; }
+.mnema-overview-vital-track { flex: 1; height: 4px; background: color-mix(in srgb, var(--mnema-text) 8%, transparent); border-radius: 99px; overflow: hidden; }
+.mnema-overview-vital-track i { display: block; height: 100%; background: var(--mnema-accent); border-radius: 99px; transition: width 320ms cubic-bezier(.16, 1, .3, 1); }
+
+.mnema-world-card { padding: 20px 22px; }
+.mnema-world-head { display: flex; align-items: flex-start; gap: 13px; margin-bottom: 14px; }
+.mnema-world-head i { color: var(--mnema-accent); font-size: 20px; opacity: 0.6; margin-top: 2px; }
+.mnema-world-head h4 { margin: 0 0 3px; font-size: 15px; font-weight: 500; }
+.mnema-world-head small { color: var(--mnema-muted); font-size: 11px; text-transform: capitalize; }
+.mnema-world-description { margin: 0; color: var(--mnema-text); font-size: 13px; line-height: 1.7; }
+
+.mnema-overview-relationship { padding: 16px 18px; margin-bottom: 16px; }
+
+.mnema-overview-relationship-people { display: flex; align-items: center; gap: 14px; }
+
+.mnema-overview-avatar {
+    position: relative;
+    display: grid;
+    flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+    place-items: center;
+    overflow: hidden;
+    color: var(--mnema-accent);
+    background: color-mix(in srgb, var(--mnema-accent) 10%, var(--mnema-glass));
+    border: 1px solid color-mix(in srgb, var(--mnema-accent) 30%, var(--mnema-border));
+    border-radius: 50%;
+}
+
+.mnema-overview-avatar::before { content: attr(data-initial); font-size: 13px; font-weight: 600; opacity: 0.55; }
+.mnema-overview-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.mnema-overview-avatar img.empty { display: none; }
+
+.mnema-overview-relationship-mid { flex: 1; display: grid; gap: 6px; min-width: 0; }
+.mnema-overview-relationship-mid strong { font-size: 12.5px; font-weight: 500; text-align: center; }
+.mnema-overview-relationship-mid small { color: var(--mnema-muted); font-size: 10px; text-align: center; }
+
+.mnema-overview-secrets {
+    display: flex;
+    padding: 14px 18px;
+    margin-bottom: 16px;
+    text-align: center;
+}
+
+.mnema-overview-secrets[hidden] { display: none !important; }
+
+.mnema-overview-secrets > div { flex: 1; display: grid; gap: 3px; }
+.mnema-overview-secrets > div:first-child { border-right: 1px solid var(--mnema-border-soft); }
+.mnema-overview-secrets strong { font-size: 18px; font-weight: 500; }
+.mnema-overview-secrets small { color: var(--mnema-muted); font-size: 9.5px; letter-spacing: 0.8px; text-transform: uppercase; }
+
+@media (max-width: 700px) {
+    .mnema-scene-strip { flex-direction: column; }
+    .mnema-scene-cell + .mnema-scene-cell::before { left: 12px; right: 12px; top: 0; bottom: auto; width: auto; height: 1px; }
+}
+
+@keyframes mnema-pulse { to { opacity: 0.35; } }
+
+.mnema-section-head, .mnema-arc-head, .mnema-note-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.mnema-section-head { margin: 0 2px 11px; }
+.mnema-section-head h4 { margin: 0; font-size: 12px; font-weight: 500; letter-spacing: 0.8px; text-transform: uppercase; }
+.mnema-section-head > span, .mnema-note small, .mnema-arc small { color: var(--mnema-muted); font-size: 10px; letter-spacing: 0.04em; }
+#mnema_pending, #mnema_arcs { display: grid; gap: 10px; }
+.mnema-note, .mnema-arc { padding: 15px 16px; }
+.mnema-note p, .mnema-arc p { margin: 9px 0 0; font-size: 13.5px; line-height: 1.6; white-space: pre-wrap; }
+
+.mnema-note-head span {
+    padding: 3px 8px;
+    color: var(--mnema-accent);
+    background: color-mix(in srgb, var(--mnema-accent) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--mnema-accent) 16%, transparent);
+    border-radius: 999px;
+    font-size: 9px;
+    white-space: nowrap;
+}
+
+.mnema-note em { display: block; margin-top: 8px; color: var(--mnema-muted); font-size: 11px; font-style: normal; }
+.mnema-arc h5 { margin: 4px 0 0; font-size: 14px; }
+.mnema-arc p { margin-bottom: 10px; }
+.mnema-arc.inactive { opacity: 0.52; }
+.mnema-arc-toggle { width: 30px; flex: 0 0 30px; padding: 0; }
+
+.mnema-empty {
+    margin: 0;
+    padding: 28px 14px;
+    color: var(--mnema-muted);
+    border: 1px dashed var(--mnema-border);
+    border-radius: 14px;
+    font-size: 12px;
+    text-align: center;
+}
+
+.mnema-placeholder {
+    display: grid;
+    min-height: 220px;
+    place-items: center;
+    align-content: center;
+    gap: 12px;
+    color: var(--mnema-muted);
+    text-align: center;
+}
+
+.mnema-placeholder i { color: var(--mnema-accent); font-size: 28px; opacity: 0.28; }
+.mnema-placeholder p { margin: 0; font-size: 12px; }
+
+.mnema-relationship-card {
+    overflow: hidden;
+    padding: 22px;
+    background: var(--mnema-glass);
+    border: 1px solid var(--mnema-border-soft);
+    border-radius: 18px;
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--mnema-text) 7%, transparent), 0 8px 24px -16px var(--SmartThemeShadowColor, #000);
+}
+
+.mnema-relationship-people {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 4px 0 18px;
+}
+
+.mnema-relationship-people figure {
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+    width: 92px;
+    margin: 0;
+}
+
+.mnema-relationship-people figure > span {
+    position: relative;
+    display: grid;
+    width: 76px;
+    height: 76px;
+    place-items: center;
+    overflow: hidden;
+    color: var(--mnema-accent);
+    background: color-mix(in srgb, var(--mnema-accent) 10%, var(--mnema-glass));
+    border: 2px solid color-mix(in srgb, var(--mnema-accent) 30%, var(--mnema-border));
+    border-radius: 50%;
+    box-shadow: 0 8px 24px -12px var(--SmartThemeShadowColor, #000), inset 0 0 0 3px color-mix(in srgb, var(--mnema-text) 5%, transparent);
+}
+
+.mnema-relationship-people figure > span::before {
+    content: attr(data-initial);
+    font-size: 22px;
+    font-weight: 600;
+    opacity: 0.55;
+}
+
+.mnema-relationship-people img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.mnema-relationship-people img.empty { display: none; }
+.mnema-relationship-people figcaption { width: 100%; overflow: hidden; font-size: 11px; font-weight: 600; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+
+.mnema-relationship-link {
+    display: flex;
+    min-width: 82px;
+    align-items: center;
+    color: color-mix(in srgb, var(--mnema-accent) 70%, var(--mnema-muted));
+}
+
+.mnema-relationship-link::before,
+.mnema-relationship-link::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: color-mix(in srgb, var(--mnema-accent) 24%, transparent);
+}
+
+.mnema-relationship-link i { padding: 0 8px; font-size: 12px; }
+.mnema-relationship-link span { display: none; }
+
+.mnema-relationship-stage {
+    display: grid;
+    justify-items: center;
+    gap: 4px;
+    margin-bottom: 18px;
+    padding: 11px 14px;
+    background: color-mix(in srgb, var(--mnema-accent) 6%, transparent);
+    border: 1px solid color-mix(in srgb, var(--mnema-accent) 13%, transparent);
+    border-radius: 13px;
+    text-align: center;
+}
+
+.mnema-relationship-stage small { color: var(--mnema-muted); font-size: 8px; letter-spacing: 1.2px; text-transform: uppercase; }
+.mnema-relationship-stage strong { font-size: 13px; font-weight: 500; }
+
+.mnema-relationship-progress {
+    display: grid;
+    gap: 7px;
+    margin-bottom: 17px;
+    padding: 13px 14px;
+    background: color-mix(in srgb, var(--mnema-text) 3%, transparent);
+    border: 1px solid var(--mnema-border-soft);
+    border-radius: 13px;
+}
+
+.mnema-relationship-progress > div:first-child,
+.mnema-relationship-metric > div:first-child {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.mnema-relationship-progress span { color: var(--mnema-muted); font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+.mnema-relationship-progress strong { font-size: 13px; font-weight: 600; }
+
+.mnema-relationship-track,
+.mnema-relationship-metric-track {
+    height: 6px;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--mnema-text) 8%, transparent);
+    border-radius: 999px;
+}
+
+.mnema-relationship-track > i,
+.mnema-relationship-metric-track > i {
+    display: block;
+    width: 0;
+    height: 100%;
+    background: var(--mnema-accent);
+    border-radius: inherit;
+    transition: width 600ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.mnema-relationship-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+
+.mnema-relationship-metric {
+    display: grid;
+    min-width: 0;
+    gap: 8px;
+    padding: 11px 12px;
+    background: color-mix(in srgb, var(--mnema-text) 3%, transparent);
+    border: 1px solid var(--mnema-border-soft);
+    border-radius: 12px;
+}
+
+.mnema-relationship-metric span { display: flex; align-items: center; gap: 6px; color: var(--mnema-muted); font-size: 9px; }
+.mnema-relationship-metric span i { width: 12px; color: var(--mnema-accent); text-align: center; }
+.mnema-relationship-metric strong { font-size: 10px; font-weight: 600; white-space: nowrap; }
+.mnema-relationship-metric strong i { margin-left: 2px; color: #7fbd91; font-size: 7px; }
+.mnema-relationship-metric strong .fa-arrow-down { color: #cf787b; }
+.mnema-relationship-metric[data-metric="trust"] .mnema-relationship-metric-track i { background: #91ad91; }
+.mnema-relationship-metric[data-metric="passion"] .mnema-relationship-metric-track i { background: #c78080; }
+.mnema-relationship-metric[data-metric="devotion"] .mnema-relationship-metric-track i { background: #829fbd; }
+.mnema-relationship-metric[data-metric="attachment"] .mnema-relationship-metric-track i { background: #bca087; }
+
+.mnema-gallery-switch {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    margin-bottom: 16px;
+    padding: 4px;
+    background: color-mix(in srgb, var(--mnema-text) 4%, transparent);
+    border: 1px solid var(--mnema-border-soft);
+    border-radius: 12px;
+}
+
+.mnema-gallery-switch button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 34px;
+    color: var(--mnema-muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    font: inherit;
+    font-size: 10px;
+    cursor: pointer;
+}
+
+.mnema-gallery-switch button.active { color: var(--mnema-text); background: var(--mnema-glass-hover); border-color: var(--mnema-border-soft); box-shadow: 0 3px 10px -6px var(--SmartThemeShadowColor, #000); }
+.mnema-gallery-switch button span { min-width: 17px; padding: 1px 5px; background: var(--mnema-glass); border-radius: 8px; font-size: 8px; }
+.mnema-gallery-grid { display: none; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.mnema-gallery-grid.active { display: grid; }
+
+.mnema-gallery-card {
+    min-width: 0;
+    overflow: hidden;
+    background: var(--mnema-glass);
+    border: 1px solid var(--mnema-border-soft);
+    border-radius: 14px;
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--mnema-text) 6%, transparent), 0 6px 18px -13px var(--SmartThemeShadowColor, #000);
+}
+
+.mnema-gallery-visual {
+    position: relative;
+    display: grid;
+    aspect-ratio: 4 / 3;
+    place-items: center;
+    overflow: hidden;
+    color: var(--mnema-accent);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--mnema-accent) 8%, transparent), color-mix(in srgb, var(--mnema-text) 2%, transparent));
+    border-bottom: 1px solid var(--mnema-border-soft);
+}
+
+.mnema-gallery-visual > i { font-size: 24px; opacity: 0.2; }
+.mnema-gallery-visual img { width: 100%; height: 100%; object-fit: cover; }
+.mnema-gallery-image-button {
+    position: absolute;
+    right: 9px;
+    bottom: 9px;
+    display: grid;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    place-items: center;
+    color: var(--mnema-text);
+    background: color-mix(in srgb, var(--SmartThemeBlurTintColor, #17151c) 78%, transparent);
+    border: 1px solid var(--mnema-border);
+    border-radius: 50%;
+    box-shadow: 0 5px 14px -7px var(--SmartThemeShadowColor, #000);
+    backdrop-filter: blur(8px);
+    cursor: pointer;
+    transition: transform 150ms ease, border-color 150ms ease, background 150ms ease;
+}
+.mnema-gallery-image-button:hover {
+    transform: translateY(-1px);
+    color: var(--mnema-accent);
+    background: var(--mnema-glass-hover);
+    border-color: var(--mnema-accent);
+}
+.mnema-gallery-image-button i { font-size: 11px; }
+.mnema-gallery-caption { padding: 12px 13px 14px; }
+.mnema-gallery-caption small { color: var(--mnema-muted); font-size: 7.5px; letter-spacing: 1px; text-transform: uppercase; }
+.mnema-gallery-caption h4 { margin: 4px 0 0; font-size: 12px; font-weight: 600; }
+.mnema-gallery-caption p { display: -webkit-box; margin: 6px 0 0; overflow: hidden; color: var(--mnema-muted); font-size: 9.5px; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.mnema-gallery-card.text-only .mnema-gallery-caption { min-height: 100px; }
+
+.mnema-gallery-empty {
+    display: grid;
+    grid-column: 1 / -1;
+    min-height: 220px;
+    place-items: center;
+    align-content: center;
+    gap: 10px;
+    color: var(--mnema-muted);
+    border: 1px dashed var(--mnema-border);
+    border-radius: 14px;
+    font-size: 10.5px;
+    text-align: center;
+}
+
+.mnema-gallery-empty i { color: var(--mnema-accent); font-size: 25px; opacity: 0.22; }
+
+.mnema-secrets-layout {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    align-items: start;
+}
+
+.mnema-secret-group {
+    min-width: 0;
+    overflow: hidden;
+    background: var(--mnema-glass);
+    border: 1px solid var(--mnema-border-soft);
+    border-radius: 16px;
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--mnema-text) 7%, transparent), 0 5px 16px -10px var(--SmartThemeShadowColor, #000);
+}
+
+.mnema-secret-group-head {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 11px;
+    min-height: 72px;
+    padding: 13px 14px;
+    border-bottom: 1px solid var(--mnema-border-soft);
+}
+
+.mnema-secret-icon {
+    display: grid;
+    width: 34px;
+    height: 34px;
+    place-items: center;
+    color: var(--mnema-accent);
+    background: color-mix(in srgb, var(--mnema-accent) 9%, transparent);
+    border: 1px solid color-mix(in srgb, var(--mnema-accent) 16%, transparent);
+    border-radius: 10px;
+    font-size: 12px;
+}
+
+.mnema-secret-group.unrevealed .mnema-secret-icon {
+    color: var(--mnema-muted);
+    background: color-mix(in srgb, var(--mnema-muted) 7%, transparent);
+    border-color: var(--mnema-border-soft);
+}
+
+.mnema-secret-group-head h4 {
+    margin: 0 0 3px;
+    overflow: hidden;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.25px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mnema-secret-group-head small {
+    display: block;
+    overflow: hidden;
+    color: var(--mnema-muted);
+    font-size: 9px;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mnema-secret-count {
+    display: grid;
+    min-width: 23px;
+    height: 23px;
+    padding: 0 6px;
+    place-items: center;
+    color: var(--mnema-muted);
+    background: var(--mnema-glass-hover);
+    border: 1px solid var(--mnema-border-soft);
+    border-radius: 999px;
+    font-size: 10px;
+}
+
+.mnema-secret-list {
+    display: grid;
+    gap: 8px;
+    padding: 10px;
+}
+
+.mnema-secret-empty {
+    display: grid;
+    min-height: 160px;
+    place-items: center;
+    align-content: center;
+    gap: 10px;
+    padding: 20px;
+    color: var(--mnema-muted);
+    font-size: 10.5px;
+    line-height: 1.45;
+    text-align: center;
+}
+
+.mnema-secret-empty i {
+    color: var(--mnema-accent);
+    font-size: 20px;
+    opacity: 0.22;
+}
+
+.mnema-secret-group.unrevealed .mnema-secret-empty i { color: var(--mnema-muted); }
+
+.mnema-secret-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 10px;
+    padding: 11px;
+    background: color-mix(in srgb, var(--mnema-text) 3%, transparent);
+    border: 1px solid transparent;
+    border-radius: 11px;
+    transition: 180ms ease;
+}
+
+.mnema-secret-item:hover {
+    background: var(--mnema-glass-hover);
+    border-color: var(--mnema-border-soft);
+}
+
+.mnema-secret-marker {
+    display: grid;
+    width: 22px;
+    height: 22px;
+    place-items: center;
+    color: var(--mnema-accent);
+    background: color-mix(in srgb, var(--mnema-accent) 9%, transparent);
+    border-radius: 7px;
+    font-size: 8px;
+}
+
+.mnema-secret-group.unrevealed .mnema-secret-marker {
+    color: var(--mnema-muted);
+    background: color-mix(in srgb, var(--mnema-muted) 8%, transparent);
+}
+
+.mnema-secret-item h5 {
+    margin: 2px 0 0;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.mnema-secret-item p {
+    margin: 5px 0 0;
+    color: var(--mnema-muted);
+    font-size: 10.5px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+
+.mnema-calendar-toolbar {
+    display: grid;
+    grid-template-columns: 32px minmax(0, 1fr) 32px;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.mnema-calendar-nav,
+.mnema-calendar-period {
+    color: var(--mnema-muted);
+    background: transparent;
+    border: 1px solid var(--mnema-border-soft);
+    border-radius: 9px;
+    cursor: pointer;
+    transition: 160ms ease;
+}
+
+.mnema-calendar-nav {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    padding: 0;
+    font-size: 9px;
+}
+
+.mnema-calendar-period {
+    display: grid;
+    gap: 2px;
+    min-height: 42px;
+    padding: 5px 12px;
+    text-align: center;
+}
+
+.mnema-calendar-period strong {
+    color: var(--mnema-text);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.7px;
+}
+
+.mnema-calendar-period small {
+    color: var(--mnema-muted);
+    font-size: 8.5px;
+    letter-spacing: 0.3px;
+}
+
+.mnema-calendar-nav:hover,
+.mnema-calendar-period:hover {
+    color: var(--mnema-text);
+    background: var(--mnema-glass-hover);
+    border-color: var(--mnema-border);
+}
+
+.mnema-calendar-week {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
+    padding: 14px 10px 11px;
+    background: var(--mnema-glass);
+    border: 1px solid var(--mnema-border-soft);
+    border-radius: 15px;
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--mnema-text) 7%, transparent), 0 5px 16px -10px var(--SmartThemeShadowColor, #000);
+}
+
+.mnema-calendar-day {
+    display: grid;
+    min-width: 0;
+    justify-items: center;
+    gap: 5px;
+    padding: 4px 2px 6px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    transition: 160ms ease;
+}
+
+.mnema-calendar-day.has-events:hover {
+    background: var(--mnema-glass-hover);
+    border-color: var(--mnema-border-soft);
+}
+
+.mnema-calendar-day small {
+    color: var(--mnema-muted);
+    font-size: 8px;
+    font-weight: 600;
+    letter-spacing: 0.7px;
+    opacity: 0.65;
+    text-transform: uppercase;
+}
+
+.mnema-calendar-day strong {
+    display: grid;
+    width: 31px;
+    height: 31px;
+    place-items: center;
+    color: var(--mnema-muted);
+    border: 1px solid transparent;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.mnema-calendar-day.has-events strong {
+    color: var(--mnema-text);
+    border-color: var(--mnema-border-soft);
+}
+
+.mnema-calendar-day.today strong {
+    color: var(--SmartThemeBlurTintColor, #111);
+    background: var(--mnema-accent);
+    border-color: transparent;
+    box-shadow: 0 3px 9px color-mix(in srgb, var(--mnema-accent) 30%, transparent);
+    font-weight: 700;
+}
+
+.mnema-calendar-dots {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-height: 5px;
+}
+
+.mnema-calendar-dots i {
+    width: 5px;
+    height: 5px;
+    background: var(--mnema-accent);
+    border-radius: 50%;
+}
+
+.mnema-calendar-dots i.birthday { background: #c084fc; }
+
+.mnema-calendar-day > span {
+    width: 100%;
+    min-height: 11px;
+    overflow: hidden;
+    color: var(--mnema-muted);
+    font-size: 8px;
+    line-height: 1.3;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mnema-calendar-day.unknown { opacity: 0.42; }
+
+.mnema-calendar-lists {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    margin-top: 20px;
+}
+
+.mnema-calendar-list-block { min-width: 0; }
+
+.mnema-calendar-list-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0 2px 8px;
+    color: var(--mnema-muted);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+}
+
+.mnema-calendar-list-title span { display: flex; align-items: center; gap: 6px; }
+.mnema-calendar-list-title i { color: var(--mnema-accent); }
+.mnema-calendar-list-title b { font-size: 9px; font-weight: 500; opacity: 0.7; }
+.mnema-calendar-items { display: grid; gap: 6px; }
+
+.mnema-birthday-item,
+.mnema-plan-item {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 9px;
+    min-height: 48px;
+    padding: 8px 10px;
+    background: var(--mnema-glass);
+    border: 1px solid var(--mnema-border-soft);
+    border-radius: 11px;
+}
+
+.mnema-calendar-item-icon {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+    place-items: center;
+    color: #c084fc;
+    background: color-mix(in srgb, #c084fc 11%, transparent);
+    border: 1px solid color-mix(in srgb, #c084fc 20%, transparent);
+    border-radius: 8px;
+    font-size: 9px;
+}
+
+.mnema-birthday-item > div,
+.mnema-plan-item > div {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+    gap: 2px;
+}
+
+.mnema-birthday-item strong,
+.mnema-plan-item strong {
+    overflow: hidden;
+    font-size: 11px;
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mnema-birthday-item small,
+.mnema-plan-item small {
+    overflow: hidden;
+    color: var(--mnema-muted);
+    font-size: 9px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mnema-birthday-item time,
+.mnema-plan-item time {
+    flex: 0 0 auto;
+    color: var(--mnema-muted);
+    font-size: 9px;
+    white-space: nowrap;
+}
+
+.mnema-birthday-item em {
+    padding: 2px 5px;
+    color: #c084fc;
+    background: color-mix(in srgb, #c084fc 11%, transparent);
+    border-radius: 7px;
+    font-size: 7px;
+    font-style: normal;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+}
+
+.mnema-plan-bar {
+    width: 3px;
+    height: 28px;
+    flex: 0 0 3px;
+    background: var(--mnema-accent);
+    border-radius: 3px;
+}
+
+.mnema-calendar-empty {
+    padding: 22px 12px;
+    color: var(--mnema-muted);
+    background: var(--mnema-glass);
+    border: 1px dashed var(--mnema-border);
+    border-radius: 11px;
+    font-size: 10px;
+    text-align: center;
+}
+
+.mnema-health-card {
+    overflow: hidden;
+    background: var(--mnema-glass);
+    border: 1px solid var(--mnema-border-soft);
+    border-radius: 17px;
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--mnema-text) 7%, transparent), 0 7px 22px -14px var(--SmartThemeShadowColor, #000);
+}
+
+.mnema-health-header {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--mnema-border-soft);
+}
+
+.mnema-health-avatar {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    color: var(--mnema-accent);
+    background: color-mix(in srgb, var(--mnema-accent) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--mnema-accent) 17%, transparent);
+    border-radius: 12px;
+    font-size: 13px;
+}
+
+.mnema-health-header > div {
+    display: grid;
+    min-width: 0;
+    gap: 2px;
+}
+
+.mnema-health-header small,
+.mnema-mood-card small {
+    color: var(--mnema-muted);
+    font-size: 8.5px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.mnema-health-header h4 {
+    margin: 0;
+    overflow: hidden;
+    font-size: 14px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mnema-health-summary {
+    padding: 4px 9px;
+    color: var(--mnema-muted);
+    background: var(--mnema-glass-hover);
+    border: 1px solid var(--mnema-border-soft);
+    border-radius: 999px;
+    font-size: 9px;
+    white-space: nowrap;
+}
+
+.mnema-health-summary[data-state="warning"] {
+    color: #e88789;
+    background: color-mix(in srgb, #c95f62 10%, transparent);
+    border-color: color-mix(in srgb, #c95f62 24%, transparent);
+}
+
+.mnema-vitals {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    padding: 18px;
+}
+
+.mnema-vital {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    padding: 14px;
+    background: color-mix(in srgb, var(--mnema-text) 3%, transparent);
+    border: 1px solid var(--mnema-border-soft);
+    border-radius: 14px;
+}
+
+.mnema-vital-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.mnema-vital-head > span {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--mnema-muted);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.mnema-vital-head > span i { color: var(--mnema-accent); font-size: 9px; }
+.mnema-vital-head strong { font-size: 15px; font-weight: 600; letter-spacing: -0.2px; }
+
+.mnema-vital-pill {
+    height: 12px;
+    overflow: hidden;
+    padding: 2px;
+    background: color-mix(in srgb, var(--mnema-text) 8%, transparent);
+    border: 1px solid var(--mnema-border-soft);
+    border-radius: 999px;
+}
+
+.mnema-vital-pill i {
+    display: block;
+    width: 0;
+    height: 100%;
+    background: var(--mnema-accent);
+    border-radius: inherit;
+    box-shadow: 0 0 9px color-mix(in srgb, var(--mnema-accent) 35%, transparent);
+    transition: width 600ms cubic-bezier(.16, 1, .3, 1), background 200ms ease;
+}
+
+.mnema-vital[data-level="low"] .mnema-vital-pill i { background: #d9a85c; }
+.mnema-vital[data-level="critical"] .mnema-vital-pill i { background: #c95f62; }
+.mnema-vital[data-level="unknown"] .mnema-vital-pill { opacity: 0.48; }
+.mnema-vital > small { color: var(--mnema-muted); font-size: 9.5px; }
+
+.mnema-mood-card {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    margin: 0 18px 18px;
+    padding: 12px 14px;
+    background: color-mix(in srgb, var(--mnema-accent) 6%, transparent);
+    border: 1px solid color-mix(in srgb, var(--mnema-accent) 13%, transparent);
+    border-radius: 13px;
+}
+
+.mnema-mood-icon {
+    display: grid;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    place-items: center;
+    color: var(--mnema-accent);
+    background: color-mix(in srgb, var(--mnema-accent) 10%, transparent);
+    border-radius: 10px;
+    font-size: 15px;
+}
+
+.mnema-mood-card > div { display: grid; gap: 2px; }
+.mnema-mood-card strong { font-size: 12px; font-weight: 500; }
+
+.mnema-injuries { margin-top: 20px; }
+.mnema-injuries[hidden] { display: none !important; }
+.mnema-injury-list { display: grid; gap: 7px; }
+
+.mnema-injury-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    padding: 11px 13px;
+    background: color-mix(in srgb, #c95f62 7%, var(--mnema-glass));
+    border: 1px solid color-mix(in srgb, #c95f62 20%, var(--mnema-border-soft));
+    border-radius: 12px;
+}
+
+.mnema-injury-item > span {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    place-items: center;
+    color: #e88789;
+    background: color-mix(in srgb, #c95f62 11%, transparent);
+    border-radius: 8px;
+    font-size: 10px;
+}
+
+.mnema-injury-item > div { display: grid; gap: 2px; }
+.mnema-injury-item strong { font-size: 11px; font-weight: 600; }
+.mnema-injury-item small { color: var(--mnema-muted); font-size: 9.5px; line-height: 1.4; }
+
+.mnema-settings-section { display: grid; gap: 14px; margin: 0 0 26px; }
+.mnema-settings-section:last-child { margin-bottom: 0; }
+.mnema-settings-section.mnema-glass-card { padding: 20px 22px; }
+
+.mnema-settings-section > h4 {
+    margin: 0;
+    color: var(--mnema-muted);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.mnema-disclosure-body { display: grid; gap: 14px; }
+.mnema-disclosure-body.mnema-glass-card { padding: 18px 20px; }
+.mnema-toggle-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+
+.mnema-section-disclosure {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 12px 16px;
+    color: var(--mnema-text);
+    background: var(--mnema-glass);
+    border: 1px solid var(--mnema-border-soft);
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 220ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.mnema-section-disclosure:hover { background: var(--mnema-glass-hover); border-color: var(--mnema-border); }
+.mnema-section-disclosure i { transition: transform 220ms cubic-bezier(.16, 1, .3, 1); }
+.mnema-section-disclosure.expanded i { transform: rotate(180deg); }
+
+#mnema_profile_fields { display: contents; }
+.mnema-field-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+
+.mnema-field {
+    display: grid;
+    gap: 6px;
+    color: var(--mnema-muted);
+    font-size: 11px;
+    letter-spacing: 0.25px;
+}
+
+.mnema-field .text_pole { width: 100%; min-height: 36px; margin: 0; }
+.mnema-field-inline { display: flex; align-items: stretch; gap: 6px; min-width: 0; }
+.mnema-field-inline .text_pole { flex: 1 1 auto; min-width: 0; }
+
+.mnema-inline-button {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    min-height: 36px;
+    margin: 0;
+    padding: 0;
+}
+.mnema-check { display: flex !important; align-items: center; gap: 11px !important; padding: 14px 16px; }
+.mnema-check > span { display: grid; gap: 2px; }
+.mnema-check strong { color: var(--mnema-text); font-size: 12px; }
+.mnema-check small { font-size: 10px; }
+#mnema_test_connection { width: 100%; min-height: 38px; margin: 2px 0 0; }
+.mnema-hint { margin: 16px 2px 0; color: var(--mnema-muted); font-size: 11px; line-height: 1.6; }
+
+.mnema-image-model-note {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin: -4px 2px 0;
+    color: var(--mnema-muted);
+    font-size: 10.5px;
+    line-height: 1.5;
+}
+
+.mnema-image-model-note i { color: var(--mnema-accent); opacity: 0.7; }
+
+.mnema-manual-note { margin: 0; color: var(--mnema-muted); font-size: 11px; line-height: 1.6; }
+#mnema_manual_run, #mnema_manual_full { width: 100%; min-height: 38px; margin: 2px 0 0; }
+#mnema_manual_run[disabled], #mnema_manual_full[disabled] { opacity: 0.45; cursor: not-allowed; }
+
+.mnema-manual-progress { display: grid; gap: 10px; padding: 16px 18px; }
+.mnema-manual-progress[hidden] { display: none !important; }
+.mnema-manual-progress-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.mnema-manual-progress-head strong { font-size: 12px; font-weight: 500; }
+
+#mnema_manual_stop {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    color: #e88789;
+    background: color-mix(in srgb, #c95f62 12%, transparent);
+    border: 1px solid color-mix(in srgb, #c95f62 30%, transparent);
+    border-radius: 9px;
+    font-size: 10.5px;
+    cursor: pointer;
+    transition: 180ms ease;
+}
+
+#mnema_manual_stop:hover { background: color-mix(in srgb, #c95f62 22%, transparent); }
+
+.mnema-manual-progress-track {
+    overflow: hidden;
+    height: 5px;
+    background: color-mix(in srgb, var(--mnema-text) 8%, transparent);
+    border-radius: 99px;
+}
+
+.mnema-manual-progress-track i {
+    display: block;
+    width: 0;
+    height: 100%;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--mnema-accent) 55%, transparent), var(--mnema-accent));
+    border-radius: 99px;
+    transition: width 320ms cubic-bezier(.16, 1, .3, 1);
+}
+
+@media (max-width: 700px) {
+    .mnema-toggle-grid, .mnema-field-row { grid-template-columns: 1fr; }
+}
+
+.mes.mnema-arc-message {
+    border-left: 3px solid color-mix(in srgb, var(--SmartThemeQuoteColor) 78%, transparent);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--SmartThemeQuoteColor) 10%, transparent), transparent 42%);
+}
+
+.mes.mnema-arc-message .ch_name .name_text::after { content: ' · сюжетная память'; opacity: 0.55; font-size: 0.78em; font-weight: 400; }
+/* Псевдоэлемент наблюдателем перевода не берётся — язык приходит атрибутом. */
+html[data-mnema-lang="en"] .mes.mnema-arc-message .ch_name .name_text::after { content: ' · story memory'; }
+
+@media (max-width: 700px) {
+    .mnema-popup { align-items: end; padding: 8px; }
+    .mnema-popup-card { width: 100%; height: min(720px, calc(100dvh - 16px)); min-height: 0; border-radius: 18px; }
+    .mnema-widget-body { flex-direction: row-reverse; }
+    .mnema-sidebar {
+        flex-basis: 56px;
+        align-items: center;
+        gap: 3px;
+        padding: 8px 5px;
+        border-right: 0;
+        border-left: 1px solid var(--mnema-border-soft);
+        scrollbar-width: none;
+    }
+    .mnema-sidebar::-webkit-scrollbar { display: none; }
+    .mnema-sidebar-label, .mnema-tab-label, .mnema-tab-ornament { display: none; }
+    .mnema-tab-btn { justify-content: center; width: 44px; min-height: 44px; padding: 0; }
+    .mnema-tab-btn i { flex-basis: 18px; }
+    .mnema-tab-badge {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        width: 7px;
+        min-width: 7px;
+        height: 7px;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        color: transparent;
+    }
+    .mnema-popup-content { padding: 20px; }
+    .mnema-header-actions button span { display: none; }
+    .mnema-header-actions button { padding: 0; }
+    .mnema-tab-title { margin-bottom: 18px; font-size: 14px; }
+    .mnema-secrets-layout { grid-template-columns: 1fr; }
+    .mnema-calendar-lists { grid-template-columns: 1fr; }
+    .mnema-vitals { grid-template-columns: 1fr; }
+    .mnema-relationship-metrics { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 420px) {
+    .mnema-popup-content { padding: 16px 13px; }
+    .mnema-note-head { align-items: flex-start; flex-direction: column; }
+    .mnema-calendar-week { gap: 1px; padding-inline: 5px; }
+    .mnema-calendar-day strong { width: 28px; height: 28px; }
+    .mnema-calendar-day > span { display: none; }
+    .mnema-health-header { padding: 14px; }
+    .mnema-health-summary { display: none; }
+    .mnema-vitals { padding: 14px; }
+    .mnema-mood-card { margin: 0 14px 14px; }
+    .mnema-relationship-card { padding: 16px 13px; }
+    .mnema-relationship-people { gap: 7px; }
+    .mnema-relationship-people figure { width: 76px; }
+    .mnema-relationship-people figure > span { width: 64px; height: 64px; }
+    .mnema-relationship-link { min-width: 48px; }
+    .mnema-gallery-grid { grid-template-columns: 1fr; }
+}
+
+/* Matrix-style gallery: compact covers, expanded personal recollections. */
+.mnema-section-edit { margin-left: auto; border: 0; background: transparent; color: inherit; cursor: pointer; padding: 6px 10px; font-size: 13px; }
+#mnema_section_editor { width: min(680px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 22px; border: 1px solid var(--SmartThemeBorderColor, #777); border-radius: 16px; background: var(--SmartThemeBlurTintColor, #24212b); color: var(--SmartThemeBodyColor, #eee); box-shadow: 0 16px 70px #0008; }
+#mnema_section_editor::backdrop { background: #0009; backdrop-filter: blur(5px); }
+#mnema_section_editor header, #mnema_section_editor footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+#mnema_section_editor header h3 { margin: 0; }
+#mnema_section_editor header button { border: 0; background: transparent; color: inherit; font-size: 26px; cursor: pointer; }
+#mnema_section_editor footer { justify-content: flex-end; margin-top: 20px; }
+#mnema_section_editor p { opacity: .7; font-size: 12px; }
+.mnema-edit-field { display: grid; gap: 6px; margin: 12px 0; font-size: 13px; }
+.mnema-edit-field .text_pole { width: 100%; min-width: 0; box-sizing: border-box; }
+.mnema-edit-field textarea { resize: vertical; min-height: 85px; }
+.mnema-edit-row { border: 1px solid var(--SmartThemeBorderColor, #777); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+.mnema-edit-card { padding: 0; overflow: hidden; }
+.mnema-edit-card > summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px 12px; padding: 13px 15px; cursor: pointer; list-style: none; }
+.mnema-edit-card > summary::-webkit-details-marker { display: none; }
+.mnema-edit-card > summary strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.mnema-edit-card > summary small { grid-column: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: .6; font-size: 11px; }
+.mnema-edit-card > summary i { grid-column: 2; grid-row: 1 / 3; align-self: center; font-size: 11px; opacity: .65; }
+.mnema-edit-card[open] > summary i { transform: rotate(180deg); }
+.mnema-edit-card[open] > summary { border-bottom: 1px solid var(--SmartThemeBorderColor, #777); }
+.mnema-edit-card-body { padding: 0 15px 14px; }
+.mnema-gallery-card.open { grid-column: 1 / -1; }
+.mnema-gallery-cover { position: relative; overflow: hidden; background: var(--mnema-glass); }
+.mnema-gallery-toggle { position: relative; display: block; width: 100%; aspect-ratio: 4/3; border: 0; padding: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; }
+.mnema-gallery-card.open .mnema-gallery-toggle { aspect-ratio: 16/9; }
+.mnema-gallery-toggle > img { width: 100%; height: 100%; object-fit: cover; }
+.mnema-gallery-cover-title { position: absolute; inset: auto 0 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 32px 13px 13px; background: linear-gradient(transparent, #000c); color: #fff; font-size: 12px; line-height: 1.4; }
+.mnema-gallery-placeholder, .mnema-gallery-loading { display: flex; width: 100%; height: 100%; align-items: center; justify-content: center; flex-direction: column; gap: 12px; padding-bottom: 28px; color: var(--mnema-muted); }
+.mnema-gallery-placeholder > i, .mnema-gallery-loading > i { font-size: 28px; color: var(--mnema-accent); opacity: .65; }
+.mnema-gallery-reveal { padding: 16px; }
+.mnema-gallery-detail p { font-size: 13px; line-height: 1.7; margin: 0 0 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.mnema-gallery-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+.mnema-gallery-actions .mnema-gallery-image-button { position: static; width: auto; height: auto; border-radius: 8px; padding: 7px 10px; font-size: 11px; }
+.mnema-gallery-view { position: absolute; top: 10px; right: 10px; border: 1px solid #fff4; border-radius: 50%; padding: 9px; background: #17151fcc; color: #fff; cursor: pointer; }
+#mnema_gallery_add { margin-top: 14px; width: 100%; }
+#mnema_image_viewer { position: fixed; inset: 0; z-index: 2147483647; display: flex; align-items: center; justify-content: center; padding: 20px; overflow: auto; background: #050506ed; overscroll-behavior: contain; touch-action: pan-x pan-y pinch-zoom; }
+#mnema_image_viewer img { display: block; max-width: calc(100vw - 40px); max-height: calc(100dvh - 40px); object-fit: contain; cursor: zoom-in; }
+#mnema_image_viewer.zoom { align-items: flex-start; justify-content: flex-start; }
+#mnema_image_viewer.zoom img { flex: 0 0 auto; max-width: none; max-height: none; margin: auto; cursor: zoom-out; }
+#mnema_image_viewer button { position: fixed; top: 15px; right: 15px; width: 36px; height: 36px; border: 1px solid #fff4; border-radius: 50%; background: #111c; color: #fff; font-size: 24px; cursor: pointer; }
+@media (max-width: 600px) { .mnema-gallery-card.open .mnema-gallery-toggle { aspect-ratio: 4/3; } }
+
+/* ── Режим «инфоблок»: плашка внутри сообщения ───────────────────────────── */
+.mnema-ib { margin: 0 0 10px; border: 1px solid var(--SmartThemeBorderColor, #fff2); border-radius: 10px; background: color-mix(in srgb, var(--SmartThemeBlurTintColor, #1a1a26) 88%, transparent); font-size: 0.85em; overflow: hidden; }
+.mnema-ib-working { margin-right: auto; align-self: center; font-size: 0.8em; opacity: 0.65; }
+.mnema-ib-action.mnema-ib-icon:disabled { opacity: 0.3; cursor: wait; pointer-events: none; }
+.mnema-ib-head { display: flex; align-items: center; gap: 10px; padding: 8px 10px; }
+.mnema-ib-place { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.mnema-ib-place i { opacity: 0.6; }
+.mnema-ib-place strong, .mnema-ib-time strong { display: block; line-height: 1.2; }
+.mnema-ib-place small, .mnema-ib-time small { display: block; opacity: 0.6; font-size: 0.85em; }
+.mnema-ib-place div { min-width: 0; }
+.mnema-ib-place strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mnema-ib-time { text-align: right; flex-shrink: 0; }
+.mnema-ib-time strong { font-variant-numeric: tabular-nums; font-size: 1.15em; }
+.mnema-ib-details summary { padding: 6px 10px; border-top: 1px solid var(--SmartThemeBorderColor, #fff2); cursor: pointer; opacity: 0.75; font-size: 0.92em; }
+.mnema-ib-details summary i { margin-right: 6px; }
+.mnema-ib-body { display: flex; flex-direction: column; gap: 10px; padding: 10px; }
+.mnema-ib-section h6 { margin: 0 0 6px; font-size: 0.9em; opacity: 0.7; font-weight: 600; }
+.mnema-ib-section h6 i { margin-right: 5px; }
+.mnema-ib-vital { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.mnema-ib-vital span { flex: 0 0 72px; opacity: 0.7; }
+.mnema-ib-vital b { flex: 0 0 38px; text-align: right; font-variant-numeric: tabular-nums; }
+.mnema-ib-track { flex: 1; height: 5px; border-radius: 3px; background: #fff2; overflow: hidden; }
+.mnema-ib-track i { display: block; height: 100%; border-radius: 3px; background: var(--SmartThemeQuoteColor, #a78bfa); }
+.mnema-ib-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.mnema-ib-tag { padding: 2px 7px; border: 1px solid var(--SmartThemeBorderColor, #fff2); border-radius: 999px; font-size: 0.85em; opacity: 0.85; }
+.mnema-ib-tag.moderate { border-color: #e0a23388; }
+.mnema-ib-tag.severe { border-color: #e0555588; }
+.mnema-ib-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }
+.mnema-ib-list li { display: flex; gap: 8px; align-items: baseline; }
+.mnema-ib-list li b { font-weight: 500; }
+.mnema-ib-list li span { margin-left: auto; opacity: 0.55; font-size: 0.85em; white-space: nowrap; }
+.mnema-ib-actions { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 2px; }
+.mnema-ib-action { padding: 5px 10px; border: 1px solid var(--SmartThemeBorderColor, #fff2); border-radius: 7px; background: transparent; color: inherit; font-size: 0.9em; cursor: pointer; }
+.mnema-ib-action:hover { background: #fff1; }
+.mnema-ib-missing { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-style: dashed; }
+.mnema-ib-missing > i { opacity: 0.6; }
+.mnema-ib-missing div { flex: 1; }
+.mnema-ib-missing small { display: block; opacity: 0.6; }
+
+/* ── Секреты: владелец и спойлер ─────────────────────────────────────────── */
+.mnema-secret-progress { height: 4px; margin: 0 0 8px; border-radius: 3px; background: #fff2; overflow: hidden; }
+.mnema-secret-progress i { display: block; height: 100%; border-radius: 3px; background: var(--SmartThemeQuoteColor, #a78bfa); transition: width 0.3s ease; }
+.mnema-secret-item.unrevealed .mnema-secret-marker { opacity: 0.45; }
+.mnema-secret-veil { opacity: 0.45; font-style: italic; font-weight: 400; }
+.mnema-secret-peek { display: block; width: 100%; margin-top: 6px; padding: 6px 10px; border: 1px dashed var(--SmartThemeBorderColor, #fff3); border-radius: 8px; background: transparent; color: inherit; font-size: 0.9em; cursor: pointer; opacity: 0.8; }
+.mnema-secret-peek:hover { opacity: 1; background: #fff1; }
+.mnema-ib-secrets summary { cursor: pointer; opacity: 0.8; font-size: 0.9em; font-weight: 600; }
+.mnema-ib-secrets summary i { margin-right: 5px; }
+.mnema-ib-secret-count { margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #fff2; font-variant-numeric: tabular-nums; font-weight: 400; }
+.mnema-ib-secrets h6 { margin: 8px 0 4px; font-size: 0.88em; opacity: 0.65; }
+.mnema-ib-secrets .mnema-ib-action { margin-top: 6px; }
+
+/* Compact scene disclosure; controls stay at the entrance, not after the content. */
+.mnema-ib { --ib-accent: var(--SmartThemeQuoteColor, #b5a2d8); border-radius: 14px; line-height: 1.5; }
+.mnema-ib-details > summary { padding: 0; border: 0; opacity: 1; font-size: inherit; list-style: none; }
+.mnema-ib-details > summary::-webkit-details-marker { display: none; }
+.mnema-ib-details > summary::marker { content: ''; }
+.mnema-ib-details > summary i { margin: 0; }
+.mnema-ib-head { padding: 12px 14px; gap: 12px; }
+.mnema-ib-details > summary:hover { background: #ffffff06; }
+.mnema-ib-details > summary:focus-visible, .mnema-ib-action:focus-visible, .mnema-ib-secrets > summary:focus-visible { outline: 2px solid var(--ib-accent); outline-offset: -3px; border-radius: 10px; }
+.mnema-ib-time strong { font-size: 1.3em; font-weight: 500; letter-spacing: 0.04em; }
+.mnema-ib-chevron { flex: 0 0 auto; font-size: 10px; opacity: 0.5; transition: transform 220ms ease, opacity 220ms ease; }
+.mnema-ib-details[open] > summary .mnema-ib-chevron { transform: rotate(180deg); opacity: 0.9; }
+.mnema-ib-actions { justify-content: flex-end; gap: 4px; padding: 5px 12px; border-top: 1px solid var(--SmartThemeBorderColor, #fff2); border-bottom: 1px solid var(--SmartThemeBorderColor, #fff2); }
+.mnema-ib-action.mnema-ib-icon { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; min-width: 32px; padding: 0; margin: 0; border: 0; border-radius: 9px; font-size: 12px; opacity: 0.7; box-shadow: none; transition: background 160ms ease, opacity 160ms ease; }
+.mnema-ib-action.mnema-ib-icon:hover { opacity: 1; background: color-mix(in srgb, var(--ib-accent) 15%, transparent); }
+.mnema-ib-body { gap: 10px; padding: 12px; }
+.mnema-ib-section { min-width: 0; padding: 12px; border: 1px solid var(--SmartThemeBorderColor, #fff2); border-radius: 11px; background: #ffffff03; overflow-wrap: anywhere; }
+.mnema-ib-section h6 { margin: 0 0 10px; font-size: 0.85em; letter-spacing: 0.035em; opacity: 0.65; }
+.mnema-ib-meters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 18px; }
+.mnema-ib-meter { --meter-color: var(--ib-accent); min-width: 0; }
+.mnema-ib-meter > div:first-child { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 6px; font-size: 0.9em; }
+.mnema-ib-meter span { opacity: 0.75; }
+.mnema-ib-meter b { font-size: 0.9em; font-weight: 500; font-variant-numeric: tabular-nums; }
+.mnema-ib-meter.low { --meter-color: #d6aa66; }
+.mnema-ib-meter.critical { --meter-color: #d87e88; }
+.mnema-ib-meter .mnema-ib-track { height: 6px; border-radius: 99px; background: #ffffff0c; }
+.mnema-ib-meter .mnema-ib-track i { border-radius: inherit; background: var(--meter-color); transition: width 250ms ease; }
+.mnema-ib-vital-card > small { display: block; margin-top: 6px; opacity: 0.65; font-size: 0.8em; }
+.mnema-ib-vital-card > .mnema-ib-warning { color: #e798a0; opacity: 1; }
+.mnema-ib-mood { margin: 0 0 12px; font-size: 0.95em; }
+.mnema-ib-tags { margin-top: 10px; }
+.mnema-ib-relationship-details > summary { padding: 0; border: 0; opacity: 1; font-size: inherit; list-style: none; cursor: pointer; }
+.mnema-ib-relationship-details > summary::-webkit-details-marker { display: none; }
+.mnema-ib-relationship-details > summary::marker { content: ''; }
+.mnema-ib-relationship-details > summary:focus-visible { outline: 2px solid var(--ib-accent); outline-offset: 4px; border-radius: 4px; }
+.mnema-ib-relationship-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+.mnema-ib-relationship-heading > i:first-child { color: #d995ab; margin: 0; }
+.mnema-ib-relationship-heading strong { flex: 1; min-width: 0; font-size: 0.95em; font-weight: 500; }
+.mnema-ib-relationship-details[open] > summary .mnema-ib-chevron { transform: rotate(180deg); }
+.mnema-ib-relationship-details > summary .mnema-ib-meter { display: flex; align-items: center; gap: 10px; }
+.mnema-ib-relationship-details > summary .mnema-ib-meter > div:first-child { order: 1; margin: 0; font-size: 0.85em; }
+.mnema-ib-relationship-details > summary .mnema-ib-meter span { display: none; }
+.mnema-ib-relationship-details > summary .mnema-ib-track { height: 4px; }
+.mnema-ib-relationship-content { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--SmartThemeBorderColor, #fff2); }
+.mnema-ib-relationship-content > .mnema-ib-note { margin: 0 0 12px; }
+.mnema-ib-relationship-content > .mnema-ib-meters { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; }
+.mnema-ib-meter.trust { --meter-color: #82b9dc; }
+.mnema-ib-meter.passion { --meter-color: #de8b94; }
+.mnema-ib-meter.devotion { --meter-color: #d6bc7c; }
+.mnema-ib-meter.attachment { --meter-color: #b39cda; }
+.mnema-ib-relationship-content .mnema-ib-meter b { color: var(--meter-color); }
+.mnema-ib-note { margin: 9px 0 0; opacity: 0.65; font-size: 0.9em; line-height: 1.5; }
+.mnema-ib-reminder { display: flex; align-items: flex-start; gap: 13px; border-left: 3px solid var(--ib-accent); }
+.mnema-ib-date-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 0 0 46px; min-height: 52px; border-radius: 9px; background: color-mix(in srgb, var(--ib-accent) 12%, transparent); color: var(--ib-accent); }
+.mnema-ib-date-tile b { font-size: 1.65em; line-height: 1.15; font-weight: 500; }
+.mnema-ib-date-tile small { font-size: 0.75em; }
+.mnema-ib-reminder > div:last-child { min-width: 0; }
+.mnema-ib-reminder h6 { margin-bottom: 4px; }
+.mnema-ib-reminder strong { font-weight: 500; }
+.mnema-ib-reminder > div > small { display: block; margin-top: 3px; opacity: 0.65; font-size: 0.8em; }
+.mnema-ib-body .mnema-ib-list li { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 6px 0; }
+.mnema-ib-body .mnema-ib-list li span { margin: 0; white-space: normal; opacity: 0.7; overflow-wrap: anywhere; }
+.mnema-ib-section.mnema-ib-secrets-section { padding: 0; overflow: hidden; }
+.mnema-ib-secrets > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border: 0; opacity: 1; list-style: none; transition: background 180ms ease; }
+.mnema-ib-secrets > summary::-webkit-details-marker { display: none; }
+.mnema-ib-secrets > summary::marker { content: ''; }
+.mnema-ib-secrets > summary:hover { background: #ffffff06; }
+.mnema-ib-secret-heading { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.mnema-ib-secret-heading > i { display: grid; place-items: center; width: 30px; height: 30px; margin: 0; border-radius: 9px; color: var(--ib-accent); background: color-mix(in srgb, var(--ib-accent) 12%, transparent); }
+.mnema-ib-secret-heading small { display: block; margin-top: 2px; font-size: 0.8em; font-weight: 400; opacity: 0.5; }
+.mnema-ib-secrets[open] > summary { border-bottom: 1px solid var(--SmartThemeBorderColor, #fff2); }
+.mnema-ib-secrets[open] > summary > .mnema-ib-chevron { transform: rotate(180deg); }
+.mnema-ib-secret-columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: 12px; padding: 12px; }
+.mnema-ib-secret-column { min-width: 0; padding: 10px; border-radius: 9px; background: #ffffff03; border: 1px solid var(--SmartThemeBorderColor, #fff2); }
+.mnema-ib-secrets .mnema-ib-secret-column h6 { margin: 0 0 12px; opacity: 0.85; }
+.mnema-ib-secret-column h6 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mnema-ib-secret-column h6 > span { min-width: 0; }
+.mnema-ib-secrets h6 .mnema-ib-icon { margin: 0; width: 26px; height: 26px; min-width: 26px; border: 0; }
+.mnema-ib-secret-form[hidden] { display: none; }
+.mnema-ib-secret-form { margin-bottom: 12px; }
+.mnema-ib-secret-form textarea { box-sizing: border-box; width: 100%; resize: vertical; padding: 8px; border: 1px solid var(--SmartThemeBorderColor, #fff2); border-radius: 8px; background: #0002; color: inherit; font: inherit; }
+.mnema-ib-secret-form > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.mnema-ib-secrets .mnema-ib-list { gap: 6px; margin-top: 8px; }
+.mnema-ib-secrets .mnema-ib-list .mnema-ib-secret { flex-direction: row; gap: 10px; padding: 10px; border-radius: 8px; background: #ffffff05; }
+.mnema-ib-secret > i { margin-top: 4px; opacity: 0.45; font-size: 11px; }
+.mnema-ib-secret > div { min-width: 0; flex: 1; }
+.mnema-ib-secret small { display: block; opacity: 0.45; font-size: 0.75em; }
+.mnema-ib-secret p { margin: 6px 0 0; opacity: 0.7; font-size: 0.9em; }
+.mnema-ib-secrets .mnema-ib-action { font-size: 0.8em; border-style: dashed; }
+@media (max-width: 420px) {
+    .mnema-ib-head { padding: 10px; gap: 8px; }
+    .mnema-ib-body { padding: 8px; }
+    .mnema-ib-section { padding: 10px; }
+    .mnema-ib-meters { grid-template-columns: 1fr; gap: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .mnema-ib-chevron, .mnema-ib-meter .mnema-ib-track i, .mnema-ib-action.mnema-ib-icon { transition: none; }
+}

@@ -1,0 +1,962 @@
+import { extension_settings, getContext } from '/scripts/extensions.js';
+import {
+    eventSource,
+    event_types,
+    extension_prompt_roles,
+    extension_prompt_types,
+    getCurrentChatId,
+    reloadCurrentChat,
+    saveSettingsDebounced,
+    setExtensionPrompt,
+    system_message_types,
+    user_avatar,
+} from '/script.js';
+import { ConnectionManagerRequestService } from '/scripts/extensions/shared.js';
+import {
+    DEFAULT_SETTINGS,
+    EXTENSION_KEY,
+    INFOBLOCK_PROMPT_KEY,
+    MENU_BUTTON_ID,
+    POPUP_ID,
+    PROMPT_KEY,
+    RELATIONSHIP_METRICS,
+    STATE_KEY,
+} from './modules/config.js';
+import { clampPercent, contiguousRanges, escapeHtml, notify } from './modules/utils.js';
+import { isRussianUi, observeTranslation, t } from './modules/i18n.js';
+import { buildAnalysisPrompt as composeAnalysisPrompt, buildArcPrompt, buildMemoryInjection } from './modules/prompts.js';
+import { menuHtml, popupHtml } from './modules/template.js';
+import { applyCalendarUpdates, dateFromIso, formatCalendarDate, renderCalendar, syncCalendarDate } from './modules/calendar.js';
+import { fetchModels, parseJsonResponse, requestModel } from './modules/model-api.js';
+import { applyGalleryUpdates, applyHealthUpdate, applyRelationshipUpdate, applySecretsUpdate, applyWorldUpdate, createState, getState, normalizeState, reconcileStateWithChat, storeSnapshot } from './modules/state.js';
+import { createRenderer } from './modules/renderer.js';
+import { createGalleryImages } from './modules/gallery-images.js';
+import { createSectionEditor } from './modules/editor.js';
+import { createGalleryController } from './modules/gallery.js';
+import { createGallerySettings } from './modules/gallery-settings.js';
+import { initializeGallerySettings } from './modules/gallery-data.js';
+import { candidateIndices, participantContext, prepareRebuiltChat, validateManualArcs, wholeChatIndices } from './modules/analysis.js';
+import { applySceneToState, buildInfoblock, infoblockInstruction, lastCharacterMessageIndex, parseSceneTag, readStoredScene, removeInfoblocks, renderInfoblock, storeScene, stripSceneTag } from './modules/infoblock.js';
+// ВРЕМЕННО: предпросмотр заполненного интерфейса, удалить вместе с demo.js.
+import { fillDemoState } from './modules/demo.js';
+
+let settings;
+let processing = false;
+let chatEpoch = 0;
+let manualRunCancelled = false;
+let galleryImages;
+let gallery;
+let gallerySettings;
+// Список моделей ручного подключения живёт в памяти сессии: он зависит от
+// адреса и ключа, поэтому в настройках его хранить нечего.
+let manualModels = [];
+let manualModelsSource = '';
+let manualModelsBusy = false;
+
+const { getParticipantVisuals, renderGallery, renderOverview, setSecretPeek, isPeeking } = createRenderer({
+    getState,
+    getSettings: () => settings,
+    isProcessing: () => processing,
+    candidateIndices,
+    getGalleryImageConfig: () => galleryImages?.getGalleryImageConfig(),
+    getGalleryStatus: () => gallery?.status() || { expanded: new Set() },
+});
+galleryImages = createGalleryImages();
+gallery = createGalleryController({ getState, getSettings: () => settings, images: galleryImages, renderGallery: state => { renderGallery(state); decorateInfoblocks(); }, onChanged: updateArcInjection, isProcessing: () => processing });
+gallerySettings = createGallerySettings({ getSettings: () => settings, saveSettings, onChanged: () => renderGallery(getState({ create: false })) });
+const sectionEditor = createSectionEditor({
+    getState,
+    isBusy: () => processing || Boolean(gallery.status().busy),
+    onSaved: () => {
+        updateArcInjection();
+        renderOverview();
+        if (settings.infoblock) decorateInfoblocks();
+    },
+});
+
+function loadSettings() {
+    extension_settings[EXTENSION_KEY] = {
+        ...DEFAULT_SETTINGS,
+        ...(extension_settings[EXTENSION_KEY] || {}),
+    };
+    settings = extension_settings[EXTENSION_KEY];
+    initializeGallerySettings(settings);
+    saveSettingsDebounced();
+}
+
+function saveSettings() {
+    settings.interval = Math.max(1, Math.min(100, Number(settings.interval) || DEFAULT_SETTINGS.interval));
+    settings.arcMaxMessages = Math.max(0, Math.min(500, Math.round(Number(settings.arcMaxMessages) || 0)));
+    settings.arcMaxTokens = Math.max(0, Math.min(200000, Math.round(Number(settings.arcMaxTokens) || 0)));
+    settings.temperature = Math.max(0, Math.min(2, Number(settings.temperature) || 0));
+    saveSettingsDebounced();
+    updateArcInjection();
+}
+
+function getProfiles() {
+    try {
+        return ConnectionManagerRequestService.getSupportedProfiles();
+    } catch (error) {
+        console.warn('[Mnema] Connection Manager is unavailable:', error);
+        return [];
+    }
+}
+
+function refreshProfileOptions() {
+    const select = document.getElementById('mnema_profile');
+    if (!select) return;
+    const profiles = getProfiles();
+    select.innerHTML = profiles.length
+        ? profiles.map(profile => `<option value="${escapeHtml(profile.id)}">${escapeHtml(profile.name || profile.model || profile.id)}</option>`).join('')
+        : '<option value="">Нет доступных профилей</option>';
+    select.value = settings.profileId || '';
+    if (!select.value && profiles[0]) {
+        settings.profileId = profiles[0].id;
+        select.value = settings.profileId;
+        saveSettings();
+    }
+}
+
+function manualEndpointKey() {
+    return `${String(settings.apiUrl || '').trim()}\n${String(settings.apiKey || '').trim()}`;
+}
+
+function renderManualModels() {
+    const list = document.getElementById('mnema_model_options');
+    if (!list) return;
+    list.innerHTML = manualModels.map(model => `<option value="${escapeHtml(model)}"></option>`).join('');
+    $('#mnema_model_refresh').prop('disabled', manualModelsBusy)
+        .find('i').toggleClass('fa-spin', manualModelsBusy);
+    $('#mnema_model').attr('title', manualModels.length
+        ? t('Доступно моделей: {n}', { n: manualModels.length })
+        : t('Нажмите «обновить», чтобы загрузить список моделей'));
+}
+
+// silent: авто-подгрузка при открытии настроек, о неудаче молчим — адрес могут
+// ещё дописывать. Явное нажатие кнопки сообщает и об ошибке, и о результате.
+async function refreshManualModels({ silent = false } = {}) {
+    if (manualModelsBusy) return;
+    const endpoint = manualEndpointKey();
+    if (!String(settings.apiUrl || '').trim()) {
+        if (!silent) notify('Сначала укажите API URL', 'error');
+        return;
+    }
+    // Список от прежнего адреса больше не применим — убираем до загрузки.
+    if (endpoint !== manualModelsSource) { manualModels = []; manualModelsSource = ''; }
+    manualModelsBusy = true;
+    renderManualModels();
+    try {
+        const models = await fetchModels(settings);
+        if (endpoint !== manualEndpointKey()) return;
+        manualModels = models;
+        manualModelsSource = endpoint;
+        if (!silent) notify(t('Загружено моделей: {n}', { n: models.length }), 'success');
+    } catch (error) {
+        console.warn('[Mnema] Не удалось получить список моделей:', error);
+        if (endpoint === manualEndpointKey()) { manualModels = []; manualModelsSource = ''; }
+        if (!silent) notify(error.message || String(error), 'error');
+    } finally {
+        manualModelsBusy = false;
+        renderManualModels();
+    }
+}
+
+function syncManualModels() {
+    renderManualModels();
+    if (settings.connectionMode !== 'manual' || manualModelsBusy) return;
+    if (!String(settings.apiUrl || '').trim() || manualModelsSource === manualEndpointKey()) return;
+    void refreshManualModels({ silent: true });
+}
+
+function updateSectionVisibility() {
+    const visibility = {
+        relationships: settings.trackRelationships,
+        calendar: settings.trackCalendar,
+        health: settings.trackHealth,
+        secrets: settings.trackSecrets,
+        gallery: settings.collectGallery,
+    };
+    for (const [tab, visible] of Object.entries(visibility)) {
+        $(`.mnema-tab-btn[data-mnema-tab="${tab}"]`).prop('hidden', !visible);
+    }
+    $('.mnema-sidebar-label').each(function () {
+        const group = $(this).nextUntil('.mnema-sidebar-label', '.mnema-tab-btn');
+        $(this).prop('hidden', group.length > 0 && group.filter(':visible').length === 0);
+    });
+    const activeTab = $('.mnema-tab-btn.active').attr('data-mnema-tab');
+    if (activeTab && visibility[activeTab] === false) $('.mnema-tab-btn[data-mnema-tab="overview"]').trigger('click');
+}
+
+function syncSettingsUi() {
+    $('#mnema_enabled').prop('checked', settings.enabled);
+    $('#mnema_interval').val(settings.interval);
+    $('#mnema_arc_max_messages').val(settings.arcMaxMessages || '');
+    $('#mnema_arc_max_tokens').val(settings.arcMaxTokens || '');
+    $('#mnema_connection_mode').val(settings.connectionMode);
+    $('#mnema_api_url').val(settings.apiUrl);
+    $('#mnema_api_key').val(settings.apiKey);
+    $('#mnema_model').val(settings.model);
+    $('#mnema_temperature').val(settings.temperature);
+    $('#mnema_track_relationships').prop('checked', settings.trackRelationships);
+    $('#mnema_track_calendar').prop('checked', settings.trackCalendar);
+    $('#mnema_track_health').prop('checked', settings.trackHealth);
+    $('#mnema_track_secrets').prop('checked', settings.trackSecrets);
+    $('#mnema_collect_gallery').prop('checked', settings.collectGallery);
+    $('#mnema_infoblock').prop('checked', settings.infoblock);
+    gallerySettings.sync();
+    refreshProfileOptions();
+    const manual = settings.connectionMode === 'manual';
+    $('#mnema_profile_fields').prop('hidden', manual);
+    $('#mnema_manual_fields').prop('hidden', !manual);
+    syncManualModels();
+    updateSectionVisibility();
+}
+
+function messageLabel(chat, index) {
+    const message = chat[index];
+    const context = getContext();
+    return message?.name || (message?.is_user ? context?.name1 : context?.name2) || t(message?.is_user ? 'Пользователь' : 'Персонаж');
+}
+
+function openPopup() {
+    const popup = document.getElementById(POPUP_ID);
+    if (!popup) return;
+    popup.hidden = false;
+    document.body.classList.add('mnema-popup-open');
+    syncSettingsUi();
+    renderOverview();
+}
+
+function closePopup() {
+    const popup = document.getElementById(POPUP_ID);
+    if (!popup || popup.hidden) return;
+    popup.hidden = true;
+    document.body.classList.remove('mnema-popup-open');
+    // Спойлер закрывается вместе с попапом — иначе тайны «протекают» в чат.
+    if (isPeeking()) { setSecretPeek(false); if (settings.infoblock) decorateInfoblocks(); }
+}
+
+function serializeMessages(chat, indices) {
+    return indices.map(index => ({ index, speaker: messageLabel(chat, index), role: chat[index].is_user ? 'user' : 'assistant', text: String(chat[index].mes || '') }));
+}
+
+function shiftRange(range, fromIndex, delta) {
+    if (!Array.isArray(range) || range.length < 2) return range;
+    return range.map(index => Number(index) >= fromIndex ? Number(index) + delta : Number(index));
+}
+
+function shiftStateIndices(state, fromIndex, delta) {
+    if (state.processedThrough >= fromIndex) state.processedThrough += delta;
+    if (Number.isInteger(state.calendar?.sourceMessageIndex) && state.calendar.sourceMessageIndex >= fromIndex) state.calendar.sourceMessageIndex += delta;
+    state.pending.messageIndices = state.pending.messageIndices.map(index => index >= fromIndex ? index + delta : index);
+    for (const note of state.pending.eventNotes) note.range = shiftRange(note.range, fromIndex, delta);
+    for (const arc of state.arcs) {
+        arc.messageIndices = (arc.messageIndices || []).map(index => index >= fromIndex ? index + delta : index);
+        arc.range = shiftRange(arc.range, fromIndex, delta);
+        if (Number.isInteger(arc.summaryMessageIndex) && arc.summaryMessageIndex >= fromIndex) arc.summaryMessageIndex += delta;
+    }
+}
+
+function createArcMessage(arc) {
+    return {
+        name: 'Mnema',
+        is_user: false,
+        is_system: arc.active === false,
+        mes: `### ${t('Конспект арки: {title}', { title: arc.title })}\n\n${arc.summary}`,
+        send_date: new Date().toISOString(),
+        extra: {
+            type: system_message_types.NARRATOR,
+            swipeable: false,
+            mnema_arc_id: arc.id,
+        },
+    };
+}
+
+function findArcMessageIndex(chat, arc) {
+    const markedIndex = chat.findIndex(message => message?.extra?.mnema_arc_id === arc.id);
+    return markedIndex >= 0 ? markedIndex : null;
+}
+
+function insertArcMessage(chat, state, arc, insertAt) {
+    shiftStateIndices(state, insertAt, 1);
+    chat.splice(insertAt, 0, createArcMessage(arc));
+    arc.summaryMessageIndex = insertAt;
+}
+
+function decorateArcMessages() {
+    const chat = getContext()?.chat;
+    if (!Array.isArray(chat)) return;
+    document.querySelectorAll('.mes[mesid]').forEach(element => {
+        const index = Number(element.getAttribute('mesid'));
+        element.classList.toggle('mnema-arc-message', Boolean(chat[index]?.extra?.mnema_arc_id));
+    });
+}
+
+async function migrateArcMessages(chat, state) {
+    let changed = false;
+    for (const arc of state.arcs) {
+        const existingIndex = findArcMessageIndex(chat, arc);
+        if (existingIndex !== null) {
+            arc.summaryMessageIndex = existingIndex;
+            continue;
+        }
+        const insertAt = Math.max(0, Math.min(...(arc.messageIndices || []).filter(Number.isInteger)));
+        if (!Number.isFinite(insertAt) || !chat[insertAt]) continue;
+        insertArcMessage(chat, state, arc, insertAt);
+        changed = true;
+    }
+    if (changed) {
+        await getContext().saveChat();
+        await reloadCurrentChat();
+    }
+    return changed;
+}
+
+function buildAnalysisPrompt(chat, state, indices, options = {}) {
+    const context = getContext();
+    return composeAnalysisPrompt({
+        state,
+        settings,
+        characterName: context?.name2,
+        userName: context?.name1,
+        participants: participantContext(context || {}),
+        messages: serializeMessages(chat, indices),
+        ...options,
+    });
+}
+async function countTokens(text) {
+    try {
+        const count = await getContext()?.getTokenCountAsync?.(text);
+        if (Number.isFinite(count)) return count;
+    } catch (error) {
+        console.warn('[Mnema] Токенизатор недоступен, оцениваю приблизительно:', error);
+    }
+    // Грубая оценка на случай недоступного токенизатора: ~4 символа на токен.
+    return Math.ceil(text.length / 4);
+}
+
+// Страховка от бесконечной арки: модель закрывает её по сюжету, а лимиты — по
+// объёму накопленного, чтобы конспект оставался пригодным для пересказа.
+async function arcLimitReached(chat, state) {
+    const indices = state.pending.messageIndices;
+    if (!indices.length) return false;
+    const maxMessages = Number(settings.arcMaxMessages) || 0;
+    if (maxMessages > 0 && indices.length >= maxMessages) {
+        console.log(`[Mnema] Лимит арки по сообщениям: ${indices.length}/${maxMessages}`);
+        return true;
+    }
+    const maxTokens = Number(settings.arcMaxTokens) || 0;
+    if (maxTokens > 0) {
+        const tokens = await countTokens(indices.map(index => String(chat[index]?.mes || '')).join('\n'));
+        if (tokens >= maxTokens) {
+            console.log(`[Mnema] Лимит арки по токенам: ${tokens}/${maxTokens}`);
+            return true;
+        }
+    }
+    return false;
+}
+
+async function analyzeBatch(chat, state, indices, epoch, options = {}) {
+    const messages = buildAnalysisPrompt(chat, state, indices, options);
+    const result = parseJsonResponse(await requestModel(messages, settings, 1800));
+    if (epoch !== chatEpoch || getContext()?.chat !== chat) throw new Error('Чат сменился во время анализа');
+    const summary = String(result.event_summary || result.summary || '').trim();
+    if (!summary) throw new Error('В ответе модели отсутствует event_summary');
+    state.pending.messageIndices.push(...indices);
+    state.pending.messageIndices = [...new Set(state.pending.messageIndices)].sort((a, b) => a - b);
+    const closeArc = result.close_arc === true || String(result.close_arc).toLowerCase() === 'true';
+    state.pending.eventNotes.push({ range: [indices[0], indices[indices.length - 1]], summary, closeArc, arcReason: String(result.arc_reason || '').trim(), createdAt: new Date().toISOString() });
+    applyAnalysisState(chat, state, result, indices);
+    state.pending.closeRequested = closeArc || await arcLimitReached(chat, state);
+    state.processedThrough = Math.max(state.processedThrough, indices[indices.length - 1]);
+    // Снимок на последнем разобранном сообщении: по нему ветка вернётся к тому
+    // состоянию, которое было на этой точке, а не унаследует будущее.
+    storeSnapshot(chat, state, indices[indices.length - 1]);
+    await getContext().saveChat();
+    updateArcInjection();
+}
+
+function applyAnalysisState(chat, state, result, indices = null) {
+    syncCalendarDate(chat, state);
+    applyWorldUpdate(state, result.world_update || result.world);
+    applyCalendarUpdates(state, result.calendar_updates || result.calendar, settings.trackCalendar);
+    applyHealthUpdate(state, result.health_update || result.health, settings);
+    applyRelationshipUpdate(state, result.relationship_update || result.relationship, settings);
+    applySecretsUpdate(state, result.secrets_update || result.secrets, settings);
+    applyGalleryUpdates(state, result.gallery_updates || result.gallery, settings, indices ? serializeMessages(chat, indices) : []);
+}
+
+async function setMessagesHidden(chat, indices, hidden) {
+    const valid = [...new Set(indices)].filter(index => index >= 0 && chat[index]);
+    for (const index of valid) chat[index].is_system = hidden;
+    try {
+        const { executeSlashCommandsWithOptions } = await import('/scripts/slash-commands.js');
+        // Подряд идущие номера уходят одним диапазоном: каждый вызов команды
+        // сохраняет чат целиком, а на арке таких сообщений десятки.
+        for (const [start, end] of contiguousRanges(valid)) {
+            const range = end > start ? `${start}-${end}` : String(start);
+            try { await executeSlashCommandsWithOptions(`${hidden ? '/hide' : '/unhide'} ${range}`); }
+            catch (error) { console.warn(`[Mnema] Не удалось ${hidden ? 'скрыть' : 'показать'} сообщения ${range}:`, error); }
+        }
+    } catch (error) {
+        console.warn('[Mnema] Нативные команды скрытия недоступны, использую прямую синхронизацию:', error);
+    }
+    for (const index of valid) {
+        chat[index].is_system = hidden;
+        document.querySelector(`.mes[mesid="${index}"]`)?.setAttribute('is_system', String(hidden));
+    }
+    await getContext().saveChat();
+}
+
+async function requestArcSummary(noteSummaries, fallbackTitle) {
+    const messages = buildArcPrompt(noteSummaries, participantContext(getContext() || {}));
+    const result = parseJsonResponse(await requestModel(messages, settings, 2400));
+    const summary = String(result.summary || '').trim();
+    if (!summary) throw new Error('В ответе модели отсутствует summary');
+    return { title: String(result.title || fallbackTitle).trim(), summary };
+}
+
+function createArc({ title, summary, indices, notes }) {
+    return {
+        id: `arc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        title, summary,
+        range: [indices[0], indices[indices.length - 1]], messageIndices: indices,
+        eventNotes: notes.map(note => ({ ...note })), active: true, createdAt: new Date().toISOString(),
+    };
+}
+
+async function finalizeArc(chat, state, epoch, { reload = true, silent = false } = {}) {
+    const indices = [...state.pending.messageIndices].filter(index => chat[index]);
+    if (!indices.length || !state.pending.eventNotes.length) { state.pending.closeRequested = false; return null; }
+    const { title, summary } = await requestArcSummary(state.pending.eventNotes.map(note => note.summary), t('Арка {n}', { n: state.arcs.length + 1 }));
+    if (epoch !== chatEpoch || getContext()?.chat !== chat) throw new Error('Чат сменился во время формирования арки');
+    const arc = createArc({ title, summary, indices, notes: state.pending.eventNotes });
+    state.arcs.push(arc);
+    insertArcMessage(chat, state, arc, indices[0]);
+    state.pending = { messageIndices: [], eventNotes: [], closeRequested: false };
+    await getContext().saveChat();
+    await setMessagesHidden(chat, arc.messageIndices, true);
+    updateArcInjection();
+    if (reload) await reloadCurrentChat();
+    if (!silent) notify(t('Арка «{title}» завершена', { title: arc.title }), 'success');
+    return arc;
+}
+
+function updateArcInjection() {
+    const chat = getContext()?.chat || [];
+    // Legacy fallback only. New arc summaries are narrator messages in their exact
+    // chronological position, so injecting them again would duplicate the memory.
+    const state = getState({ create: false });
+    const active = state?.arcs?.filter(arc => arc.active !== false && findArcMessageIndex(chat, arc) === null) || [];
+    const arcs = active.length
+        ? `<mnema_arcs>\n${active.map((arc, index) => `ARC ${index + 1}: ${arc.title}\n${arc.summary}`).join('\n\n')}\n</mnema_arcs>` : '';
+    setExtensionPrompt(PROMPT_KEY, settings.enabled ? arcs : '', extension_prompt_types.IN_PROMPT, 0, false, extension_prompt_roles.SYSTEM);
+    const narrativeContext = settings.enabled ? buildMemoryInjection(state, settings) : '';
+    // Инструкция для основной модели идёт в самый конец чата, сразу после
+    // сообщения пользователя, иначе модель про метку забывает.
+    setExtensionPrompt(
+        INFOBLOCK_PROMPT_KEY,
+        [narrativeContext, settings.enabled && settings.infoblock ? infoblockInstruction(settings) : ''].filter(Boolean).join('\n\n'),
+        extension_prompt_types.IN_CHAT, 0, false, extension_prompt_roles.SYSTEM,
+    );
+}
+
+// ── Режим «инфоблок» ───────────────────────────────────────────────────────
+function renderInfoblockFor(messageIndex) {
+    const chat = getContext()?.chat || [];
+    const message = chat[messageIndex];
+    if (!message || message.is_user) return;
+    const live = messageIndex === lastCharacterMessageIndex(chat);
+    const scene = readStoredScene(message);
+    // Replies without updates use the existing state; no missing-tag warning.
+    if (!scene && !live) return;
+    renderInfoblock(messageIndex, buildInfoblock({ scene, state: getState({ create: false }), settings, live, busy: Boolean(gallery?.status().busy), peek: isPeeking() }));
+}
+
+function decorateInfoblocks() {
+    if (!settings.infoblock) return removeInfoblocks();
+    const chat = getContext()?.chat || [];
+    for (let index = 0; index < chat.length; index++) {
+        if (readStoredScene(chat[index]) || index === lastCharacterMessageIndex(chat)) renderInfoblockFor(index);
+    }
+}
+
+async function processSceneTag(messageIndex) {
+    if (!settings.infoblock) return;
+    const context = getContext();
+    const message = context?.chat?.[messageIndex];
+    if (!message || message.is_user || message.is_system) return;
+    if (readStoredScene(message)) { renderInfoblockFor(messageIndex); return; }
+
+    const state = getState();
+    const scene = parseSceneTag(message.mes, state?.calendar?.currentDate) || {};
+
+    if (scene.raw) message.mes = stripSceneTag(message.mes);
+    const changed = applySceneToState(state, scene, settings, messageIndex);
+    // Store the effective scene for this message, including carried-forward values.
+    storeScene(message, {
+        ...scene,
+        clock: state?.world?.clock || scene.clock,
+        date: settings.trackCalendar ? state?.calendar?.currentDate || scene.date : null,
+        location: state?.world?.location || scene.location,
+        description: state?.world?.description || scene.description,
+        indoor: state?.world?.indoor ?? scene.indoor,
+        weather: state?.world?.weather || scene.weather,
+        temperature: state?.world?.temperature ?? scene.temperature,
+        characterOutfit: state?.world?.characterOutfit || scene.characterOutfit,
+        userOutfit: state?.world?.userOutfit || scene.userOutfit,
+    });
+    await context.saveChat();
+    if (changed) updateArcInjection();
+    // Текст изменился — перерисовываем сообщение целиком, потом плашку.
+    if (scene.raw) context.updateMessageBlock?.(messageIndex, message);
+    renderInfoblockFor(messageIndex);
+    renderOverview();
+}
+
+async function processAvailable({ force = false } = {}) {
+    if (processing || gallery.status().busy) return;
+    const chat = getContext()?.chat;
+    const state = getState();
+    if (!Array.isArray(chat) || !state) return;
+    const epoch = chatEpoch;
+    processing = true;
+    renderOverview();
+    try {
+        if (state.pending.closeRequested) await finalizeArc(chat, state, epoch);
+        while (epoch === chatEpoch && getContext()?.chat === chat) {
+            const available = candidateIndices(chat, state);
+            if (!available.length || (!force && available.length < settings.interval)) break;
+            const batch = available.slice(0, settings.interval);
+            await analyzeBatch(chat, state, batch, epoch);
+            force = false;
+            if (state.pending.closeRequested) await finalizeArc(chat, state, epoch);
+        }
+    } catch (error) {
+        console.error('[Mnema] Ошибка обработки:', error);
+        if (!/Чат сменился/.test(error.message)) notify(error.message || String(error), 'error');
+    } finally {
+        processing = false;
+        renderOverview();
+    }
+}
+
+// В новом чате первая же генерация идёт без базы истории: приветствие и реплика
+// игрока ещё не разобраны, поэтому модель получает пустую память. MESSAGE_SENT
+// ждут внутри Generate() до сборки промпта — разбираем эти два сообщения прямо
+// здесь, и отправка уходит уже с готовым состоянием.
+function isFreshChat(state) {
+    return state.processedThrough < 0 && !state.arcs.length
+        && !state.pending.eventNotes.length && !state.pending.messageIndices.length;
+}
+
+async function bootstrapNewChat(messageIndex) {
+    if (!settings.enabled || processing || gallery.status().busy) return;
+    // Только самое начало чата: приветствие (0) и первая реплика игрока (1).
+    if (!Number.isInteger(messageIndex) || messageIndex > 1) return;
+    const chat = getContext()?.chat;
+    if (!Array.isArray(chat) || !chat[messageIndex]?.is_user) return;
+    const state = getState();
+    if (!state || !isFreshChat(state)) return;
+    const indices = candidateIndices(chat, state).filter(index => index <= messageIndex);
+    if (!indices.length) return;
+    const epoch = chatEpoch;
+    processing = true;
+    renderOverview();
+    notify('Собираю базу истории по началу чата…', 'info');
+    try {
+        // Арка не может закрыться на первой же реплике — лишний вопрос модели.
+        await analyzeBatch(chat, state, indices, epoch, { detectArcEnd: false });
+    } catch (error) {
+        console.error('[Mnema] Ошибка стартового анализа:', error);
+        if (!/Чат сменился/.test(error.message)) notify(error.message || String(error), 'error');
+    } finally {
+        processing = false;
+        renderOverview();
+        if (settings.infoblock) decorateInfoblocks();
+    }
+}
+
+function parseMessageIndices(input, chat, state) {
+    const wanted = new Set();
+    for (const chunk of String(input || '').split(/[,;\s]+/).filter(Boolean)) {
+        const range = /^(\d+)\s*[-–—]\s*(\d+)$/.exec(chunk);
+        if (range) {
+            const from = Math.min(Number(range[1]), Number(range[2]));
+            const to = Math.max(Number(range[1]), Number(range[2]));
+            for (let index = from; index <= to; index++) wanted.add(index);
+            continue;
+        }
+        if (/^\d+$/.test(chunk)) wanted.add(Number(chunk));
+        else throw new Error(t('Не понимаю «{chunk}». Формат: 12-40 или 12,15,18', { chunk }));
+    }
+    if (!wanted.size) throw new Error('Укажите номера сообщений');
+
+    const archived = new Set(state.arcs.flatMap(arc => arc.messageIndices || []));
+    const indices = [];
+    const skipped = { missing: 0, empty: 0, archived: 0 };
+    for (const index of [...wanted].sort((a, b) => a - b)) {
+        const message = chat[index];
+        if (index < 0 || !message) { skipped.missing++; continue; }
+        if (archived.has(index) || message.extra?.mnema_arc_id) { skipped.archived++; continue; }
+        if (!String(message.mes || '').trim()) { skipped.empty++; continue; }
+        indices.push(index);
+    }
+    if (!indices.length) throw new Error('Среди указанных номеров нет подходящих сообщений');
+    return { indices, skipped };
+}
+
+function setManualProgress(text, ratio) {
+    $('#mnema_manual_progress').prop('hidden', !text);
+    if (!text) return;
+    $('#mnema_manual_progress_text').text(text);
+    $('#mnema_manual_progress_fill').css('width', `${Math.round(Math.max(0, Math.min(1, ratio || 0)) * 100)}%`);
+}
+
+function applyManualArcs(chat, state, parts) {
+    const selected = new Set(parts.flatMap(part => part.indices));
+    state.pending.messageIndices = state.pending.messageIndices.filter(index => !selected.has(index));
+    state.pending.eventNotes = state.pending.eventNotes.filter(note => {
+        const [start, end] = note.range || [];
+        // Keep a partially covered note: its unselected facts still matter.
+        for (let index = start; index <= end; index++) if (!selected.has(index)) return true;
+        return false;
+    });
+    if (!state.pending.messageIndices.length) state.pending.closeRequested = false;
+    const arcs = [];
+    for (const part of parts) {
+        if (!part.closed) {
+            state.pending.messageIndices.push(...part.indices);
+            state.pending.eventNotes.push({
+                range: [part.indices[0], part.indices.at(-1)], summary: part.summary,
+                closeArc: false, arcReason: '', createdAt: new Date().toISOString(),
+            });
+            continue;
+        }
+        arcs.push(createArc({ title: part.title, summary: part.summary, indices: [...part.indices], notes: [] }));
+    }
+    // Register every arc before inserting summaries so all indices shift together.
+    state.arcs.push(...arcs);
+    for (const arc of arcs) insertArcMessage(chat, state, arc, arc.messageIndices[0]);
+    for (const arc of arcs) for (const index of arc.messageIndices) chat[index].is_system = true;
+    return arcs.length;
+}
+
+async function runManualAnalysis({ chat, state, indices, wholeChat = false, skipped = 0 }) {
+    const epoch = chatEpoch;
+    const original = JSON.stringify(chat);
+    const originalState = JSON.stringify(state);
+    const context = getContext();
+    processing = true;
+    manualRunCancelled = false;
+    renderOverview();
+    let committed = false;
+    try {
+        const analysisState = wholeChat ? createState(chat) : state;
+        setManualProgress(t('Отправляю {n} сообщений одним запросом…', { n: indices.length }), 0.1);
+        const messages = buildAnalysisPrompt(chat, analysisState, indices, {
+            manual: true, wholeChat, sections: wholeChat, detectArcEnd: false,
+        });
+        const result = parseJsonResponse(await requestModel(messages, settings, 8192));
+        if (manualRunCancelled) { notify('Анализ отменён, данные не изменены', 'info'); return; }
+        if (epoch !== chatEpoch || getContext()?.chat !== chat) throw new Error('Чат сменился во время анализа');
+        if (JSON.stringify(chat) !== original || JSON.stringify(state) !== originalState) {
+            throw new Error('Чат или память изменились во время анализа. Запустите анализ ещё раз.');
+        }
+        const parts = validateManualArcs(result, indices, wholeChat);
+        setManualProgress('Сохраняю арки и память…', 0.9);
+        let draftChat;
+        let draftState;
+        if (wholeChat) {
+            const rebuilt = prepareRebuiltChat(chat, state);
+            draftChat = rebuilt.messages;
+            for (const part of parts) part.indices = part.indices.map(index => rebuilt.indexMap.get(index));
+            draftState = createState(draftChat);
+            applyAnalysisState(draftChat, draftState, result);
+            draftState.processedThrough = draftChat.length - 1;
+        } else {
+            draftChat = structuredClone(chat);
+            draftState = structuredClone(state);
+        }
+        const count = applyManualArcs(draftChat, draftState, parts);
+        // No chat mutation or reset occurs until the complete response is validated.
+        chat.length = 0;
+        for (const message of draftChat) chat.push(message);
+        context.chatMetadata[STATE_KEY] = draftState;
+        try {
+            await context.saveChat();
+        } catch (error) {
+            chat.length = 0;
+            for (const message of JSON.parse(original)) chat.push(message);
+            context.chatMetadata[STATE_KEY] = state;
+            throw error;
+        }
+        committed = true;
+        updateArcInjection();
+        notify(t('Анализ завершён. Создано арок: {n}{open}{skipped}', {
+            n: count,
+            open: parts.some(part => !part.closed) ? t(' · текущая арка оставлена открытой') : '',
+            skipped: skipped ? t(' · пропущено {n}', { n: skipped }) : '',
+        }), 'success');
+    } catch (error) {
+        console.error('[Mnema] Ошибка ручного анализа:', error);
+        if (!/Чат сменился/.test(error.message)) notify(error.message || String(error), 'error');
+    } finally {
+        processing = false;
+        manualRunCancelled = false;
+        setManualProgress('');
+        if (committed && epoch === chatEpoch && getContext()?.chat === chat) await reloadCurrentChat();
+        renderOverview();
+    }
+}
+
+async function analyzeManualRange(input) {
+    if (processing || gallery.status().busy) return;
+    const chat = getContext()?.chat;
+    const state = getState();
+    if (!Array.isArray(chat) || !state) { notify('Откройте чат', 'error'); return; }
+    try {
+        const { indices, skipped } = parseMessageIndices(input, chat, state);
+        await runManualAnalysis({ chat, state, indices, skipped: skipped.missing + skipped.empty + skipped.archived });
+    } catch (error) {
+        notify(error.message, 'error');
+    }
+}
+
+async function analyzeWholeChat() {
+    if (processing || gallery.status().busy) return;
+    const context = getContext();
+    const chat = context?.chat;
+    const state = getState();
+    if (!Array.isArray(chat) || !state) { notify('Откройте чат', 'error'); return; }
+    const epoch = chatEpoch;
+    const confirmed = await context.callGenericPopup(
+        `<h3>${t('Пересчитать весь чат с нуля?')}</h3><p>${t('Все исходные сообщения будут отправлены одним запросом. Модель сама выделит арки и соберёт итоговое состояние разделов.')}</p><p>${t('После успешного анализа существующие арки ({n}) и память будут заменены. При ошибке или отмене они сохранятся.', { n: state.arcs.length })}</p>`,
+        context.POPUP_TYPE.CONFIRM,
+        '',
+        { okButton: t('Пересчитать'), cancelButton: t('Отмена') },
+    );
+    if (confirmed !== context.POPUP_RESULT.AFFIRMATIVE || processing) return;
+    if (epoch !== chatEpoch || getContext()?.chat !== chat) { notify('Чат сменился, пересчёт отменён', 'info'); return; }
+    const indices = wholeChatIndices(chat, state);
+    if (!indices.length) { notify('Нет сообщений для анализа', 'info'); return; }
+    await runManualAnalysis({ chat, state, indices, wholeChat: true });
+}
+
+async function toggleArc(arcId) {
+    const chat = getContext()?.chat;
+    const state = getState({ create: false });
+    const arc = state?.arcs?.find(item => item.id === arcId);
+    if (!chat || !arc) return;
+    arc.active = arc.active === false;
+    await setMessagesHidden(chat, arc.messageIndices, arc.active);
+    const summaryIndex = findArcMessageIndex(chat, arc);
+    if (summaryIndex !== null) await setMessagesHidden(chat, [summaryIndex], !arc.active);
+    updateArcInjection();
+    decorateArcMessages();
+    renderOverview();
+}
+
+async function refreshCalendarFromChat() {
+    const chat = getContext()?.chat;
+    const state = getState({ create: false });
+    if (!Array.isArray(chat) || !state) return;
+    if (syncCalendarDate(chat, state)) await getContext().saveChat();
+    updateArcInjection();
+    renderCalendar(state);
+}
+
+function bindEvents() {
+    sectionEditor.bindEvents();
+    gallery.bindEvents();
+    gallerySettings.bindEvents();
+    $(document).on('click', `#${MENU_BUTTON_ID}`, openPopup);
+    $(document).on('keydown', `#${MENU_BUTTON_ID}`, event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openPopup(); } });
+    $(document).on('click', '#mnema_popup_close', closePopup);
+    $(document).on('click', `#${POPUP_ID}`, event => { if (event.target.id === POPUP_ID) closePopup(); });
+    $(document).on('keydown.mnema', event => { if (event.key === 'Escape' && !document.getElementById(POPUP_ID)?.hidden) closePopup(); });
+    $(document).on('click', '.mnema-tab-btn', function () {
+        const tab = this.dataset.mnemaTab;
+        $(`#${POPUP_ID} .mnema-tab-btn`).removeClass('active').filter(`[data-mnema-tab="${tab}"]`).addClass('active');
+        $(`#${POPUP_ID} .mnema-tab-panel`).removeClass('active').filter(`[data-mnema-panel="${tab}"]`).addClass('active');
+    });
+    $(document).on('click', '#mnema_manual_run', () => void analyzeManualRange($('#mnema_manual_range').val()));
+    $(document).on('keydown', '#mnema_manual_range', function (event) {
+        if (event.key === 'Enter') { event.preventDefault(); void analyzeManualRange(this.value); }
+    });
+    $(document).on('click', '#mnema_manual_full', () => void analyzeWholeChat());
+    $(document).on('click', '#mnema_manual_stop', () => { manualRunCancelled = true; setManualProgress('Останавливаю после текущего запроса…', 1); });
+    $(document).on('click', '#mnema_analyze_now', () => void processAvailable({ force: true }));
+    // ВРЕМЕННО: заполнить все разделы примерами. Ничего не сохраняет — данные
+    // исчезнут при перезагрузке чата. Удалить вместе с modules/demo.js.
+    $(document).on('click', '#mnema_demo_fill', () => {
+        const state = getState();
+        if (!state) return notify('Откройте чат', 'error');
+        fillDemoState(state);
+        gallery.reset();
+        updateArcInjection();
+        renderOverview();
+        notify('Демо-данные подставлены. Не сохраняются: перезагрузите чат, чтобы вернуть реальные.', 'info');
+    });
+    $(document).on('click', '.mnema-calendar-nav', function () {
+        const state = getState({ create: false });
+        if (!state) return;
+        state.calendar.viewOffsetWeeks += Number(this.dataset.calendarShift) || 0;
+        void getContext().saveChat();
+        renderCalendar(state);
+    });
+    $(document).on('click', '#mnema_calendar_today', () => {
+        const state = getState({ create: false });
+        if (!state) return;
+        state.calendar.viewOffsetWeeks = 0;
+        void getContext().saveChat();
+        renderCalendar(state);
+    });
+    $(document).on('click', '.mnema-arc-toggle', function () { void toggleArc(this.closest('.mnema-arc')?.dataset.arcId); });
+    $(document).on('click', '.mnema-secret-peek', function () {
+        setSecretPeek(this.dataset.mnemaPeek === 'on');
+        if (settings.infoblock) decorateInfoblocks();
+    });
+    $(document).on('change', '#mnema_enabled', function () { settings.enabled = this.checked; saveSettings(); renderOverview(); });
+    $(document).on('change', '#mnema_interval', function () { settings.interval = this.value; saveSettings(); syncSettingsUi(); renderOverview(); });
+    $(document).on('change', '#mnema_arc_max_messages', function () { settings.arcMaxMessages = this.value; saveSettings(); syncSettingsUi(); });
+    $(document).on('change', '#mnema_arc_max_tokens', function () { settings.arcMaxTokens = this.value; saveSettings(); syncSettingsUi(); });
+    $(document).on('change', '#mnema_connection_mode', function () { settings.connectionMode = this.value === 'manual' ? 'manual' : 'profile'; saveSettings(); syncSettingsUi(); });
+    $(document).on('change', '#mnema_profile', function () { settings.profileId = this.value; saveSettings(); });
+    $(document).on('change', '#mnema_api_url', function () { settings.apiUrl = this.value.trim(); saveSettings(); syncManualModels(); });
+    $(document).on('change', '#mnema_api_key', function () { settings.apiKey = this.value.trim(); saveSettings(); syncManualModels(); });
+    $(document).on('click', '#mnema_model_refresh', () => void refreshManualModels());
+    $(document).on('change', '#mnema_model', function () { settings.model = this.value.trim(); saveSettings(); });
+    $(document).on('change', '#mnema_temperature', function () { settings.temperature = this.value; saveSettings(); syncSettingsUi(); });
+    $(document).on('click', '.mnema-section-disclosure', function () {
+        const expanded = $(this).toggleClass('expanded').hasClass('expanded');
+        this.setAttribute('aria-expanded', String(expanded));
+        $(`#${this.dataset.mnemaDisclosure}`).prop('hidden', !expanded);
+    });
+    $(document).on('change', '#mnema_track_relationships', function () { settings.trackRelationships = this.checked; saveSettings(); updateSectionVisibility(); });
+    $(document).on('change', '#mnema_track_calendar', function () { settings.trackCalendar = this.checked; saveSettings(); updateSectionVisibility(); });
+    $(document).on('change', '#mnema_track_health', function () { settings.trackHealth = this.checked; saveSettings(); updateSectionVisibility(); });
+    $(document).on('change', '#mnema_track_secrets', function () { settings.trackSecrets = this.checked; saveSettings(); updateSectionVisibility(); });
+    $(document).on('change', '#mnema_collect_gallery', function () { settings.collectGallery = this.checked; saveSettings(); updateSectionVisibility(); });
+    $(document).on('change', '#mnema_infoblock', function () {
+        settings.infoblock = this.checked;
+        saveSettings();
+        if (this.checked) decorateInfoblocks(); else removeInfoblocks();
+    });
+    $(document).on('click', '.mnema-ib-action', async function () {
+        const action = this.dataset.mnemaIb;
+        const messageId = Number(this.closest('.mes')?.getAttribute('mesid'));
+        if (action === 'add-secret' || action === 'cancel-secret') {
+            const column = this.closest('.mnema-ib-secret-column');
+            const form = column.querySelector('.mnema-ib-secret-form');
+            form.hidden = action === 'cancel-secret' || !form.hidden;
+            column.querySelector('[data-mnema-ib="add-secret"]').setAttribute('aria-expanded', String(!form.hidden));
+            if (!form.hidden) form.elements.secret.focus();
+            return;
+        }
+        if (action === 'peek' || action === 'unpeek') { setSecretPeek(action === 'peek'); return decorateInfoblocks(); }
+        if (action === 'open') return openPopup();
+        if (action === 'edit') return sectionEditor.open();
+        if (action === 'analyze') return void processAvailable({ force: true });
+        if (action === 'retry') return void processSceneTag(messageId);
+        if (action === 'memory' || action === 'item') {
+            await gallery.reconstruct(null, action === 'item' ? 'item' : 'memory');
+        }
+    });
+    $(document).on('submit', '.mnema-ib-secret-form', async function (event) {
+        event.preventDefault();
+        if (this.dataset.saving) return;
+        if (processing) return notify('Дождитесь завершения анализа', 'info');
+        const context = getContext();
+        const state = getState({ create: false });
+        const text = this.elements.secret.value.trim();
+        if (!state || !settings.trackSecrets || !text) return;
+        const title = text.slice(0, 120);
+        if ([...state.secrets.revealed, ...state.secrets.unrevealed].some(secret => secret.title.toLowerCase() === title.toLowerCase())) return notify('Секрет с таким названием уже есть', 'info');
+        const secret = { title, summary: text.length > 120 ? text : '', owner: this.dataset.owner === 'user' ? 'user' : 'char' };
+        this.dataset.saving = 'true';
+        state.secrets.unrevealed.push(secret);
+        try {
+            await context.saveChat();
+            if (getState({ create: false }) === state) {
+                updateArcInjection();
+                renderOverview();
+                decorateInfoblocks();
+            }
+        } catch (error) {
+            const index = state.secrets.unrevealed.indexOf(secret);
+            if (index >= 0) state.secrets.unrevealed.splice(index, 1);
+            notify(error.message || 'Не удалось сохранить секрет', 'error');
+        } finally { delete this.dataset.saving; }
+    });
+    $(document).on('click', '#mnema_test_connection', async function () {
+        const button = $(this).prop('disabled', true);
+        try { const response = await requestModel([{ role: 'user', content: 'Reply with one word: OK' }], settings, 16); notify(`Подключение работает: ${response.slice(0, 80)}`, 'success'); }
+        catch (error) { notify(error.message || String(error), 'error'); }
+        finally { button.prop('disabled', false); }
+    });
+}
+
+async function onChatChanged() {
+    chatEpoch++;
+    sectionEditor.close();
+    gallery.reset();
+    galleryImages.cancel?.();
+    const state = getState();
+    const chat = getContext()?.chat;
+    if (state && Array.isArray(chat)) {
+        // Сверка идёт до миграции арок: иначе унаследованная веткой арка из
+        // будущего получит здесь сообщение-конспект несуществующих событий.
+        const reconciled = reconcileStateWithChat(state, chat);
+        if (reconciled) {
+            notify(reconciled === 'snapshot'
+                ? 'Память отмотана к состоянию на этой точке чата'
+                : 'Память обрезана по этому чату: снимка на этой точке не нашлось, накопленные значения разделов остались прежними', 'info');
+        }
+        syncCalendarDate(chat, state);
+        await getContext().saveChat();
+        if (await migrateArcMessages(chat, state)) return;
+    }
+    updateArcInjection();
+    renderOverview();
+    setTimeout(decorateArcMessages, 0);
+    setTimeout(decorateInfoblocks, 0);
+}
+
+function initialize() {
+    loadSettings();
+    if (!document.getElementById(MENU_BUTTON_ID)) $('#extensionsMenu').append(menuHtml());
+    if (!document.getElementById(POPUP_ID)) $('body').append(popupHtml());
+    // Рендер вставляет русский HTML, поэтому перевод живёт наблюдателем: попап
+    // и плашки перерисовываются целиком и часто.
+    document.documentElement.setAttribute('data-mnema-lang', isRussianUi() ? 'ru' : 'en');
+    observeTranslation([`#${POPUP_ID}`, '#extensionsMenu', '#chat']);
+    bindEvents(); syncSettingsUi(); void onChatChanged();
+    eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
+    eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, messageId => {
+        // Метку разбираем до анализа: она уточняет дату и место для конспекта.
+        setTimeout(() => void processSceneTag(messageId ?? lastCharacterMessageIndex(getContext()?.chat || [])), 50);
+        setTimeout(() => void refreshCalendarFromChat(), 100);
+        if (settings.enabled) setTimeout(() => void processAvailable(), 300);
+    });
+    // Слушатель намеренно блокирующий: Generate() ждёт MESSAGE_SENT, поэтому
+    // сообщение уходит уже после того, как память заполнена.
+    eventSource.on(event_types.MESSAGE_SENT, messageId => bootstrapNewChat(messageId));
+    eventSource.on(event_types.USER_MESSAGE_RENDERED, () => setTimeout(() => void refreshCalendarFromChat(), 100));
+    eventSource.on(event_types.MESSAGE_UPDATED, messageId => {
+        // Разобранная сцена лежит в extra сообщения, поэтому правка текста
+        // просто перерисовывает плашку и не тратит ни одного запроса.
+        if (settings.infoblock && Number.isInteger(messageId)) setTimeout(() => renderInfoblockFor(messageId), 50);
+        setTimeout(() => void refreshCalendarFromChat(), 100);
+    });
+    eventSource.on(event_types.MESSAGE_SWIPED, () => setTimeout(decorateInfoblocks, 50));
+    eventSource.on(event_types.MESSAGE_DELETED, () => {
+        const state = getState({ create: false });
+        if (state) normalizeState(state, getContext().chat);
+        updateArcInjection(); renderOverview();
+    });
+    eventSource.on(event_types.GENERATION_STARTED, updateArcInjection);
+    console.log('[Mnema] initialized');
+}
+
+$(() => initialize());
