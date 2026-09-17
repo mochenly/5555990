@@ -103,6 +103,21 @@ export function stripSceneTag(text) {
     return String(text || '').replace(new RegExp(TAG.source, 'gi'), '').replace(/[ \t]+$/gm, '').replace(/\n{3,}$/, '\n').trimEnd();
 }
 
+// Метка живёт не только в message.mes. ST рисует сообщение из display_text,
+// если его выставил перевод или regex-скрипт «только отображение», а в контекст
+// уходит текущий свайп — почистить надо все три копии, иначе метка останется
+// видимой или вернётся в промпт при свайпе.
+export function stripSceneTagFromMessage(message) {
+    if (!message) return false;
+    const before = message.mes;
+    message.mes = stripSceneTag(message.mes);
+    if (Array.isArray(message.swipes) && Number.isInteger(message.swipe_id) && message.swipes.length > message.swipe_id) {
+        message.swipes[message.swipe_id] = message.mes;
+    }
+    if (message.extra?.display_text) message.extra.display_text = stripSceneTag(message.extra.display_text);
+    return message.mes !== before;
+}
+
 export function readStoredScene(message) {
     return message?.extra?.[SCENE_KEY] || null;
 }

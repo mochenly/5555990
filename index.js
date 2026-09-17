@@ -36,7 +36,7 @@ import { createGalleryController } from './modules/gallery.js';
 import { createGallerySettings } from './modules/gallery-settings.js';
 import { initializeGallerySettings } from './modules/gallery-data.js';
 import { candidateIndices, participantContext, prepareRebuiltChat, validateManualArcs, wholeChatIndices } from './modules/analysis.js';
-import { applySceneToState, buildInfoblock, infoblockInstruction, lastCharacterMessageIndex, parseSceneTag, readStoredScene, removeInfoblocks, renderInfoblock, storeScene, stripSceneTag } from './modules/infoblock.js';
+import { applySceneToState, buildInfoblock, infoblockInstruction, lastCharacterMessageIndex, parseSceneTag, readStoredScene, removeInfoblocks, renderInfoblock, storeScene, stripSceneTagFromMessage } from './modules/infoblock.js';
 // ВРЕМЕННО: предпросмотр заполненного интерфейса, удалить вместе с demo.js.
 import { fillDemoState } from './modules/demo.js';
 
@@ -482,24 +482,19 @@ function decorateInfoblocks() {
 }
 
 async function processSceneTag(messageIndex) {
-    if (!settings.infoblock) return;
+    if (!settings.infoblock) return false;
     const context = getContext();
     const message = context?.chat?.[messageIndex];
-    if (!message || message.is_user || message.is_system) return;
+    if (!message || message.is_user || message.is_system) return false;
     const state = getState();
-    if (!state) return;
+    if (!state) return false;
     const parsed = parseSceneTag(message.mes, state.calendar?.currentDate);
     // A carried-forward snapshot is not proof that the final reply was parsed.
     // Streaming, edits and swipes can append a new tag after that snapshot.
-    if (!parsed && readStoredScene(message)) { renderInfoblockFor(messageIndex); return; }
+    if (!parsed && readStoredScene(message)) { renderInfoblockFor(messageIndex); return false; }
     const scene = parsed || {};
 
-    if (scene.raw) {
-        message.mes = stripSceneTag(message.mes);
-        if (Array.isArray(message.swipes) && Number.isInteger(message.swipe_id)) {
-            message.swipes[message.swipe_id] = message.mes;
-        }
-    }
+    if (scene.raw) stripSceneTagFromMessage(message);
     const changed = applySceneToState(state, scene, settings, messageIndex);
     // Store the effective scene for this message, including carried-forward values.
     storeScene(message, {
@@ -520,9 +515,17 @@ async function processSceneTag(messageIndex) {
     renderInfoblockFor(messageIndex);
     renderOverview();
     await context.saveChat();
+    return Boolean(scene.raw);
 }
 
-function scheduleSceneTag(messageId, delay = 50) {
+// При стриминге message.mes — это ещё не ответ, а срез потока. Свайп, остановка
+// и смена чата приходят как раз посреди генерации, и разбор такого текста
+// записал бы сообщению снимок сцены до того, как модель дописала метку.
+function isGenerating() {
+    return document.body.dataset.generating === 'true';
+}
+
+function scheduleSceneTag(messageId, delay = 50, { rechecks = 1, waits = 20 } = {}) {
     const chat = getContext()?.chat;
     const epoch = chatEpoch;
     const index = messageId == null ? lastCharacterMessageIndex(chat || []) : Number(messageId);
@@ -530,7 +533,16 @@ function scheduleSceneTag(messageId, delay = 50) {
     if (!message || !Number.isInteger(index)) return;
     setTimeout(() => {
         if (chatEpoch !== epoch || getContext()?.chat !== chat || chat[index] !== message) return;
-        void processSceneTag(index).catch(error => {
+        if (isGenerating()) {
+            if (waits > 0) scheduleSceneTag(index, 300, { rechecks, waits: waits - 1 });
+            return;
+        }
+        void processSceneTag(index).then(stripped => {
+            // Текст сообщения могут переписать уже после нас: авто-продолжение
+            // возвращает метку из копии, снятой до вырезки, а разбор reasoning
+            // переписывает mes целиком. Один контрольный проход это ловит.
+            if (stripped && rechecks > 0) scheduleSceneTag(index, 400, { rechecks: rechecks - 1, waits });
+        }).catch(error => {
             console.error('[Mnema] Scene tag processing failed:', error);
             notify('Не удалось сохранить данные инфоблока: ' + (error.message || String(error)), 'error');
         });
