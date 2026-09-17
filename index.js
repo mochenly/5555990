@@ -486,12 +486,20 @@ async function processSceneTag(messageIndex) {
     const context = getContext();
     const message = context?.chat?.[messageIndex];
     if (!message || message.is_user || message.is_system) return;
-    if (readStoredScene(message)) { renderInfoblockFor(messageIndex); return; }
-
     const state = getState();
-    const scene = parseSceneTag(message.mes, state?.calendar?.currentDate) || {};
+    if (!state) return;
+    const parsed = parseSceneTag(message.mes, state.calendar?.currentDate);
+    // A carried-forward snapshot is not proof that the final reply was parsed.
+    // Streaming, edits and swipes can append a new tag after that snapshot.
+    if (!parsed && readStoredScene(message)) { renderInfoblockFor(messageIndex); return; }
+    const scene = parsed || {};
 
-    if (scene.raw) message.mes = stripSceneTag(message.mes);
+    if (scene.raw) {
+        message.mes = stripSceneTag(message.mes);
+        if (Array.isArray(message.swipes) && Number.isInteger(message.swipe_id)) {
+            message.swipes[message.swipe_id] = message.mes;
+        }
+    }
     const changed = applySceneToState(state, scene, settings, messageIndex);
     // Store the effective scene for this message, including carried-forward values.
     storeScene(message, {
@@ -506,12 +514,27 @@ async function processSceneTag(messageIndex) {
         characterOutfit: state?.world?.characterOutfit || scene.characterOutfit,
         userOutfit: state?.world?.userOutfit || scene.userOutfit,
     });
-    await context.saveChat();
-    if (changed) updateArcInjection();
     // Текст изменился — перерисовываем сообщение целиком, потом плашку.
     if (scene.raw) context.updateMessageBlock?.(messageIndex, message);
+    if (changed) updateArcInjection();
     renderInfoblockFor(messageIndex);
     renderOverview();
+    await context.saveChat();
+}
+
+function scheduleSceneTag(messageId, delay = 50) {
+    const chat = getContext()?.chat;
+    const epoch = chatEpoch;
+    const index = messageId == null ? lastCharacterMessageIndex(chat || []) : Number(messageId);
+    const message = chat?.[index];
+    if (!message || !Number.isInteger(index)) return;
+    setTimeout(() => {
+        if (chatEpoch !== epoch || getContext()?.chat !== chat || chat[index] !== message) return;
+        void processSceneTag(index).catch(error => {
+            console.error('[Mnema] Scene tag processing failed:', error);
+            notify('Не удалось сохранить данные инфоблока: ' + (error.message || String(error)), 'error');
+        });
+    }, delay);
 }
 
 async function processAvailable({ force = false } = {}) {
@@ -921,6 +944,7 @@ async function onChatChanged() {
     renderOverview();
     setTimeout(decorateArcMessages, 0);
     setTimeout(decorateInfoblocks, 0);
+    scheduleSceneTag(null, 0);
 }
 
 function initialize() {
@@ -935,7 +959,7 @@ function initialize() {
     eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
     eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, messageId => {
         // Метку разбираем до анализа: она уточняет дату и место для конспекта.
-        setTimeout(() => void processSceneTag(messageId ?? lastCharacterMessageIndex(getContext()?.chat || [])), 50);
+        scheduleSceneTag(messageId);
         setTimeout(() => void refreshCalendarFromChat(), 100);
         if (settings.enabled) setTimeout(() => void processAvailable(), 300);
     });
@@ -944,12 +968,13 @@ function initialize() {
     eventSource.on(event_types.MESSAGE_SENT, messageId => bootstrapNewChat(messageId));
     eventSource.on(event_types.USER_MESSAGE_RENDERED, () => setTimeout(() => void refreshCalendarFromChat(), 100));
     eventSource.on(event_types.MESSAGE_UPDATED, messageId => {
-        // Разобранная сцена лежит в extra сообщения, поэтому правка текста
-        // просто перерисовывает плашку и не тратит ни одного запроса.
-        if (settings.infoblock && Number.isInteger(messageId)) setTimeout(() => renderInfoblockFor(messageId), 50);
+        // Reparse local metadata too: edited replies may contain a fresh tag.
+        if (settings.infoblock) scheduleSceneTag(messageId);
         setTimeout(() => void refreshCalendarFromChat(), 100);
     });
-    eventSource.on(event_types.MESSAGE_SWIPED, () => setTimeout(decorateInfoblocks, 50));
+    eventSource.on(event_types.MESSAGE_SWIPED, () => { scheduleSceneTag(); setTimeout(decorateInfoblocks, 50); });
+    // GENERATION_ENDED passes chat.length, not a message index.
+    eventSource.on(event_types.GENERATION_ENDED, () => scheduleSceneTag());
     eventSource.on(event_types.MESSAGE_DELETED, () => {
         const state = getState({ create: false });
         if (state) normalizeState(state, getContext().chat);
