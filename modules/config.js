@@ -36,3 +36,12 @@ export const RELATIONSHIP_METRICS = Object.freeze([
     ['devotion', 'Преданность', 'fa-hand-holding-heart'],
     ['attachment', 'Привязанность', 'fa-link'],
 ]);
+
+// Лестница отношений у каждой истории своя: общий список ступеней не подходит ни
+// одному конкретному сюжету, поэтому её складывает разбор и хранит состояние
+// чата. Свободная «стадия» описывает сегодняшний оттенок, ступень отвечает на
+// один вопрос — где именно история сейчас, — а между двумя ступенями в любой
+// момент может появиться третья, если сюжет её показал.
+export const RELATIONSHIP_LADDER_LIMIT = 14;
+export const RELATIONSHIP_RUNG_TITLE_LIMIT = 60;
+export const RELATIONSHIP_RUNG_NOTE_LIMIT = 220;

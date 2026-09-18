@@ -33,10 +33,11 @@ import { createRenderer } from './modules/renderer.js';
 import { createGalleryImages } from './modules/gallery-images.js';
 import { createSectionEditor } from './modules/editor.js';
 import { createGalleryController } from './modules/gallery.js';
+import { createFocusController } from './modules/focus.js';
 import { createGallerySettings } from './modules/gallery-settings.js';
 import { initializeGallerySettings } from './modules/gallery-data.js';
 import { candidateIndices, participantContext, prepareRebuiltChat, validateManualArcs, wholeChatIndices } from './modules/analysis.js';
-import { applySceneToState, buildInfoblock, infoblockInstruction, lastCharacterMessageIndex, parseSceneTag, readStoredScene, removeInfoblocks, renderInfoblock, storeScene, stripSceneTagFromMessage } from './modules/infoblock.js';
+import { applySceneToState, buildInfoblock, hasSceneTag, infoblockInstruction, lastCharacterMessageIndex, parseSceneTag, readStoredScene, removeInfoblocks, renderInfoblock, sceneTagSource, storeScene, stripSceneTagFromMessage } from './modules/infoblock.js';
 // ВРЕМЕННО: предпросмотр заполненного интерфейса, удалить вместе с demo.js.
 import { fillDemoState } from './modules/demo.js';
 
@@ -62,11 +63,24 @@ const { getParticipantVisuals, renderGallery, renderOverview, setSecretPeek, isP
     getGalleryStatus: () => gallery?.status() || { expanded: new Set() },
 });
 galleryImages = createGalleryImages();
-gallery = createGalleryController({ getState, getSettings: () => settings, images: galleryImages, renderGallery: state => { renderGallery(state); decorateInfoblocks(); }, onChanged: updateArcInjection, isProcessing: () => processing });
+gallery = createGalleryController({ getState, getSettings: () => settings, images: galleryImages, renderGallery: state => { renderGallery(state); decorateInfoblocks(); }, onChanged: updateArcInjection, isProcessing: () => processing || Boolean(focus.status().busy) });
 gallerySettings = createGallerySettings({ getSettings: () => settings, saveSettings, onChanged: () => renderGallery(getState({ create: false })) });
+// Фокусная генерация раздела: секреты и планы по отдельной кнопке, без общего
+// анализа. Перерисовываем всё, чего она касается, — попап и плашку в чате.
+const focus = createFocusController({
+    getState,
+    getSettings: () => settings,
+    isProcessing: () => processing || Boolean(gallery.status().busy),
+    onChanged: () => {
+        updateArcInjection();
+        renderOverview();
+        if (settings.infoblock) decorateInfoblocks();
+        syncFocusButtons();
+    },
+});
 const sectionEditor = createSectionEditor({
     getState,
-    isBusy: () => processing || Boolean(gallery.status().busy),
+    isBusy: () => processing || Boolean(gallery.status().busy) || Boolean(focus.status().busy),
     onSaved: () => {
         updateArcInjection();
         renderOverview();
@@ -225,6 +239,22 @@ function openPopup() {
     document.body.classList.add('mnema-popup-open');
     syncSettingsUi();
     renderOverview();
+    syncFocusButtons();
+}
+
+// Кнопки фокусной генерации живут и в попапе, и в плашке под сообщением,
+// причём плашка перерисовывается сама по себе. Поэтому состояние проставляем им
+// по атрибуту, а не из рендера конкретного раздела.
+function syncFocusButtons() {
+    const busy = focus.status().busy;
+    const disabled = Boolean(busy) || processing || Boolean(gallery?.status().busy);
+    $('[data-mnema-focus]').each(function () {
+        const active = Boolean(busy) && busy.kind === this.dataset.mnemaFocus
+            && (busy.kind !== 'secrets' || busy.owner === this.dataset.focusOwner);
+        this.disabled = disabled;
+        this.setAttribute('aria-busy', String(active));
+        $(this).find('i').attr('class', active ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-wand-magic-sparkles');
+    });
 }
 
 function closePopup() {
@@ -357,7 +387,10 @@ async function arcLimitReached(chat, state) {
 }
 
 async function analyzeBatch(chat, state, indices, epoch, options = {}) {
-    const messages = buildAnalysisPrompt(chat, state, indices, options);
+    // replaceNote — повторная проверка уже разобранного интервала: заметка о нём
+    // заменяется, а не ложится второй копией. В промпт этот флаг не идёт.
+    const { replaceNote = null, ...promptOptions } = options;
+    const messages = buildAnalysisPrompt(chat, state, indices, promptOptions);
     const result = parseJsonResponse(await requestModel(messages, settings, 1800));
     if (epoch !== chatEpoch || getContext()?.chat !== chat) throw new Error('Чат сменился во время анализа');
     const summary = String(result.event_summary || result.summary || '').trim();
@@ -365,7 +398,9 @@ async function analyzeBatch(chat, state, indices, epoch, options = {}) {
     state.pending.messageIndices.push(...indices);
     state.pending.messageIndices = [...new Set(state.pending.messageIndices)].sort((a, b) => a - b);
     const closeArc = result.close_arc === true || String(result.close_arc).toLowerCase() === 'true';
-    state.pending.eventNotes.push({ range: [indices[0], indices[indices.length - 1]], summary, closeArc, arcReason: String(result.arc_reason || '').trim(), createdAt: new Date().toISOString() });
+    const note = { range: [indices[0], indices[indices.length - 1]], summary, closeArc, arcReason: String(result.arc_reason || '').trim(), createdAt: new Date().toISOString() };
+    if (Number.isInteger(replaceNote) && state.pending.eventNotes[replaceNote]) state.pending.eventNotes[replaceNote] = note;
+    else state.pending.eventNotes.push(note);
     applyAnalysisState(chat, state, result, indices);
     state.pending.closeRequested = closeArc || await arcLimitReached(chat, state);
     state.processedThrough = Math.max(state.processedThrough, indices[indices.length - 1]);
@@ -378,7 +413,12 @@ async function analyzeBatch(chat, state, indices, epoch, options = {}) {
 
 function applyAnalysisState(chat, state, result, indices = null) {
     syncCalendarDate(chat, state);
-    applyWorldUpdate(state, result.world_update || result.world);
+    // Анализ видел только свою пачку сообщений, поэтому и время помечаем её
+    // последним номером. Разбор всего чата (indices не задан) видел всё.
+    const clockIndex = indices?.length ? indices[indices.length - 1] : chat.length - 1;
+    // При включённом инфоблоке время ведёт метка основной модели: она идёт по
+    // каждому сообщению, а анализ только оценивает его по пачке задним числом.
+    applyWorldUpdate(state, result.world_update || result.world, clockIndex, { tieWins: !settings.infoblock });
     applyCalendarUpdates(state, result.calendar_updates || result.calendar, settings.trackCalendar);
     applyHealthUpdate(state, result.health_update || result.health, settings);
     applyRelationshipUpdate(state, result.relationship_update || result.relationship, settings);
@@ -488,7 +528,7 @@ async function processSceneTag(messageIndex) {
     if (!message || message.is_user || message.is_system) return false;
     const state = getState();
     if (!state) return false;
-    const parsed = parseSceneTag(message.mes, state.calendar?.currentDate);
+    const parsed = parseSceneTag(sceneTagSource(message) || message.mes, state.calendar?.currentDate);
     // A carried-forward snapshot is not proof that the final reply was parsed.
     // Streaming, edits and swipes can append a new tag after that snapshot.
     if (!parsed && readStoredScene(message)) { renderInfoblockFor(messageIndex); return false; }
@@ -532,7 +572,12 @@ function scheduleSceneTag(messageId, delay = 50, { rechecks = 1, waits = 20 } = 
     const message = chat?.[index];
     if (!message || !Number.isInteger(index)) return;
     setTimeout(() => {
-        if (chatEpoch !== epoch || getContext()?.chat !== chat || chat[index] !== message) return;
+        if (chatEpoch !== epoch || getContext()?.chat !== chat) return;
+        // Сообщение по индексу могли подменить, пока мы ждали: соседние
+        // расширения переписывают и перерисовывают ответ после нас. Пока в нём
+        // лежит неразобранная метка, она важнее совпадения объектов — иначе
+        // разбор теряется молча, а метка остаётся видимой в чате.
+        if (chat[index] !== message && !hasSceneTag(sceneTagSource(chat[index]))) return;
         if (isGenerating()) {
             if (waits > 0) scheduleSceneTag(index, 300, { rechecks, waits: waits - 1 });
             return;
@@ -549,8 +594,24 @@ function scheduleSceneTag(messageId, delay = 50, { rechecks = 1, waits = 20 } = 
     }, delay);
 }
 
+// Страховка на случай, когда разбор перебило чужое расширение: оно могло
+// переписать текст ответа уже после нашего прохода, перерисовать сообщение или
+// отложенно дописать в него свой блок. Метка, оставшаяся в чате, — единственный
+// надёжный признак пропущенного разбора, поэтому подбираем её ещё раз.
+function sweepSceneTags(depth = 6) {
+    if (!settings.infoblock || isGenerating()) return;
+    const chat = getContext()?.chat || [];
+    // Строго от старых к новым: разбор применяет сцену к общему состоянию, и
+    // метка позднего сообщения должна лечь поверх ранней, а не наоборот.
+    for (let index = Math.max(0, chat.length - depth); index < chat.length; index++) {
+        const message = chat[index];
+        if (!message || message.is_user || message.is_system) continue;
+        if (hasSceneTag(sceneTagSource(message))) scheduleSceneTag(index, 0, { rechecks: 0 });
+    }
+}
+
 async function processAvailable({ force = false } = {}) {
-    if (processing || gallery.status().busy) return;
+    if (processing || gallery.status().busy || focus.status().busy) return;
     const chat = getContext()?.chat;
     const state = getState();
     if (!Array.isArray(chat) || !state) return;
@@ -569,6 +630,50 @@ async function processAvailable({ force = false } = {}) {
         }
     } catch (error) {
         console.error('[Mnema] Ошибка обработки:', error);
+        if (!/Чат сменился/.test(error.message)) notify(error.message || String(error), 'error');
+    } finally {
+        processing = false;
+        renderOverview();
+    }
+}
+
+// «Проверить» и палочка в плашке делают по одной кнопке две вещи: сначала
+// разбирают всё накопленное, не дожидаясь интервала, а если разбирать нечего —
+// перечитывают последний интервал заново. Второе нужно, когда в разделы что-то
+// не подхватилось: промпт тот же, заново перечитываются те же сообщения.
+function recheckableInterval(chat, state) {
+    const noteIndex = (state?.pending?.eventNotes?.length || 0) - 1;
+    const note = state?.pending?.eventNotes?.[noteIndex];
+    if (!note) return null;
+    // Берём ровно сообщения последней заметки: так перечитанный интервал
+    // совпадает с заменяемой заметкой и частичных перекрытий не возникает.
+    const indices = (state.pending.messageIndices || []).filter(index => index >= note.range[0] && index <= note.range[1] && chat[index]);
+    return indices.length ? { indices, noteIndex } : null;
+}
+
+function analyzeOrRecheck() {
+    const chat = getContext()?.chat;
+    const state = getState();
+    if (!Array.isArray(chat) || !state) return notify('Откройте чат', 'error');
+    if (candidateIndices(chat, state).length) return void processAvailable({ force: true });
+    void recheckLastInterval(chat, state);
+}
+
+async function recheckLastInterval(chat, state) {
+    if (processing || gallery.status().busy || focus.status().busy) return;
+    const target = recheckableInterval(chat, state);
+    if (!target) return notify('Нечего перепроверять: новых сообщений нет, а прошлые интервалы уже сведены в арки', 'info');
+    const epoch = chatEpoch;
+    processing = true;
+    renderOverview();
+    try {
+        await analyzeBatch(chat, state, target.indices, epoch, { replaceNote: target.noteIndex });
+        if (epoch !== chatEpoch || getContext()?.chat !== chat) return;
+        if (state.pending.closeRequested) await finalizeArc(chat, state, epoch);
+        if (settings.infoblock) decorateInfoblocks();
+        notify(t('Интервал #{from}–#{to} перечитан', { from: target.indices[0], to: target.indices[target.indices.length - 1] }), 'success');
+    } catch (error) {
+        console.error('[Mnema] Ошибка перепроверки:', error);
         if (!/Чат сменился/.test(error.message)) notify(error.message || String(error), 'error');
     } finally {
         processing = false;
@@ -821,7 +926,7 @@ function bindEvents() {
     });
     $(document).on('click', '#mnema_manual_full', () => void analyzeWholeChat());
     $(document).on('click', '#mnema_manual_stop', () => { manualRunCancelled = true; setManualProgress('Останавливаю после текущего запроса…', 1); });
-    $(document).on('click', '#mnema_analyze_now', () => void processAvailable({ force: true }));
+    $(document).on('click', '#mnema_analyze_now', () => analyzeOrRecheck());
     // ВРЕМЕННО: заполнить все разделы примерами. Ничего не сохраняет — данные
     // исчезнут при перезагрузке чата. Удалить вместе с modules/demo.js.
     $(document).on('click', '#mnema_demo_fill', () => {
@@ -878,6 +983,9 @@ function bindEvents() {
         saveSettings();
         if (this.checked) decorateInfoblocks(); else removeInfoblocks();
     });
+    $(document).on('click', '[data-mnema-focus]', function () {
+        void focus.generate(this.dataset.mnemaFocus, this.dataset.focusOwner === 'user' ? 'user' : 'char');
+    });
     $(document).on('click', '.mnema-ib-action', async function () {
         const action = this.dataset.mnemaIb;
         const messageId = Number(this.closest('.mes')?.getAttribute('mesid'));
@@ -892,7 +1000,7 @@ function bindEvents() {
         if (action === 'peek' || action === 'unpeek') { setSecretPeek(action === 'peek'); return decorateInfoblocks(); }
         if (action === 'open') return openPopup();
         if (action === 'edit') return sectionEditor.open();
-        if (action === 'analyze') return void processAvailable({ force: true });
+        if (action === 'analyze') return analyzeOrRecheck();
         if (action === 'retry') return void processSceneTag(messageId);
         if (action === 'memory' || action === 'item') {
             await gallery.reconstruct(null, action === 'item' ? 'item' : 'memory');
@@ -957,6 +1065,8 @@ async function onChatChanged() {
     setTimeout(decorateArcMessages, 0);
     setTimeout(decorateInfoblocks, 0);
     scheduleSceneTag(null, 0);
+    // Чат мог быть сохранён с непойманными метками — подбираем их при открытии.
+    setTimeout(() => sweepSceneTags(), 300);
 }
 
 function initialize() {
@@ -974,6 +1084,8 @@ function initialize() {
         scheduleSceneTag(messageId);
         setTimeout(() => void refreshCalendarFromChat(), 100);
         if (settings.enabled) setTimeout(() => void processAvailable(), 300);
+        // Фоновая дописка чужого расширения приходит уже после нашего разбора.
+        setTimeout(() => sweepSceneTags(), 2000);
     });
     // Слушатель намеренно блокирующий: Generate() ждёт MESSAGE_SENT, поэтому
     // сообщение уходит уже после того, как память заполнена.
@@ -984,7 +1096,7 @@ function initialize() {
         if (settings.infoblock) scheduleSceneTag(messageId);
         setTimeout(() => void refreshCalendarFromChat(), 100);
     });
-    eventSource.on(event_types.MESSAGE_SWIPED, () => { scheduleSceneTag(); setTimeout(decorateInfoblocks, 50); });
+    eventSource.on(event_types.MESSAGE_SWIPED, () => { scheduleSceneTag(); setTimeout(decorateInfoblocks, 50); setTimeout(() => sweepSceneTags(), 2000); });
     // GENERATION_ENDED passes chat.length, not a message index.
     eventSource.on(event_types.GENERATION_ENDED, () => scheduleSceneTag());
     eventSource.on(event_types.MESSAGE_DELETED, () => {

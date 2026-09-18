@@ -125,6 +125,7 @@ export function popupHtml() {
                                         <span class="mnema-secret-icon"><i class="fa-solid fa-user"></i></span>
                                         <div><h4 id="mnema_user_secrets_title">Секреты {{user}}</h4><small>Ваши тайны — вы их и так знаете</small></div>
                                         <span id="mnema_user_secrets_count" class="mnema-secret-count">0</span>
+                                        <button type="button" class="mnema-section-edit" data-mnema-focus="secrets" data-focus-owner="user" title="Придумать секреты персоны" aria-label="Придумать секреты персоны"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
                                         <button type="button" class="mnema-section-edit" data-mnema-edit="secrets" data-edit-owner="user" title="Редактировать секреты персоны" aria-label="Редактировать секреты персоны"><i class="fa-solid fa-pen"></i></button>
                                     </header>
                                     <div id="mnema_user_secrets" class="mnema-secret-list"></div>
@@ -134,6 +135,7 @@ export function popupHtml() {
                                         <span class="mnema-secret-icon"><i class="fa-solid fa-mask"></i></span>
                                         <div><h4 id="mnema_char_secrets_title">Секреты {{char}}</h4><small><span id="mnema_char_secrets_progress">0 из 0 раскрыто</span></small></div>
                                         <span id="mnema_char_secrets_count" class="mnema-secret-count">0</span>
+                                        <button type="button" class="mnema-section-edit" data-mnema-focus="secrets" data-focus-owner="char" title="Придумать секреты персонажа" aria-label="Придумать секреты персонажа"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
                                         <button type="button" class="mnema-section-edit" data-mnema-edit="secrets" data-edit-owner="char" title="Редактировать секреты персонажа" aria-label="Редактировать секреты персонажа"><i class="fa-solid fa-pen"></i></button>
                                     </header>
                                     <div class="mnema-secret-progress"><i id="mnema_char_secrets_fill"></i></div>
@@ -150,6 +152,11 @@ export function popupHtml() {
                                     <figure><span><img id="mnema_char_avatar" alt=""></span><figcaption id="mnema_char_name">{{char}}</figcaption></figure>
                                 </div>
                                 <div class="mnema-relationship-stage"><small>Стадия отношений</small><strong id="mnema_relationship_stage">Не определено</strong></div>
+                                <div id="mnema_relationship_phase" class="mnema-relationship-phase" hidden>
+                                    <small>Ступени этой истории</small>
+                                    <ol id="mnema_relationship_phase_track" class="mnema-phase-track"></ol>
+                                    <p id="mnema_relationship_next" class="mnema-phase-next" hidden><i class="fa-solid fa-arrow-right-long"></i><span><b>Следующий шаг:</b> <span id="mnema_relationship_next_text"></span></span></p>
+                                </div>
                                 <div class="mnema-relationship-progress">
                                     <div><span>Общий прогресс</span><strong id="mnema_relationship_progress_value">0%</strong></div>
                                     <div class="mnema-relationship-track"><i id="mnema_relationship_progress_fill"></i></div>
@@ -174,7 +181,7 @@ export function popupHtml() {
                                     <div id="mnema_birthdays" class="mnema-calendar-items"></div>
                                 </section>
                                 <section class="mnema-calendar-list-block">
-                                    <div class="mnema-calendar-list-title"><span><i class="fa-solid fa-clock"></i> Ближайшие планы</span><b id="mnema_plan_count">0</b></div>
+                                    <div class="mnema-calendar-list-title"><span><i class="fa-solid fa-clock"></i> Ближайшие планы</span><span><b id="mnema_plan_count">0</b><button type="button" class="mnema-section-edit" data-mnema-focus="plans" title="Придумать поводы пересечься" aria-label="Придумать поводы пересечься"><i class="fa-solid fa-wand-magic-sparkles"></i></button></span></div>
                                     <div id="mnema_plans" class="mnema-calendar-items"></div>
                                 </section>
                             </div>

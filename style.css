@@ -474,6 +474,60 @@ body.mnema-popup-open { overflow: hidden; }
 .mnema-relationship-stage small { color: var(--mnema-muted); font-size: 8px; letter-spacing: 1.2px; text-transform: uppercase; }
 .mnema-relationship-stage strong { font-size: 13px; font-weight: 500; }
 
+.mnema-relationship-phase {
+    display: grid;
+    gap: 9px;
+    margin-bottom: 17px;
+    padding: 13px 14px;
+    background: color-mix(in srgb, var(--mnema-text) 3%, transparent);
+    border: 1px solid var(--mnema-border-soft);
+    border-radius: 13px;
+}
+
+.mnema-relationship-phase > small { color: var(--mnema-muted); font-size: 8px; letter-spacing: 1.2px; text-transform: uppercase; }
+
+.mnema-phase-track {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.mnema-phase-step {
+    padding: 4px 9px;
+    border: 1px solid var(--mnema-border-soft);
+    border-radius: 999px;
+    color: var(--mnema-muted);
+    font-size: 9.5px;
+    white-space: nowrap;
+}
+
+.mnema-phase-step[data-state="passed"] { border-color: color-mix(in srgb, var(--mnema-accent) 22%, transparent); color: color-mix(in srgb, var(--mnema-text) 60%, transparent); }
+
+.mnema-phase-step[data-state="current"] {
+    background: color-mix(in srgb, var(--mnema-accent) 16%, transparent);
+    border-color: color-mix(in srgb, var(--mnema-accent) 45%, transparent);
+    color: var(--mnema-text);
+    font-weight: 600;
+}
+
+.mnema-phase-step[data-state="ahead"] { opacity: .45; }
+.mnema-phase-step[data-phase="estranged"][data-state="current"] { background: color-mix(in srgb, #cf787b 20%, transparent); border-color: #cf787b; }
+
+.mnema-phase-next {
+    display: flex;
+    gap: 7px;
+    margin: 0;
+    color: var(--mnema-muted);
+    font-size: 10.5px;
+    line-height: 1.5;
+}
+
+.mnema-phase-next > i { margin-top: 3px; color: var(--mnema-accent); font-size: 9px; }
+.mnema-phase-next b { color: var(--mnema-text); font-weight: 600; }
+
 .mnema-relationship-progress {
     display: grid;
     gap: 7px;
@@ -653,7 +707,8 @@ body.mnema-popup-open { overflow: hidden; }
 
 .mnema-secret-group-head {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    /* Иконка, заголовок, счётчик и две кнопки — придумать и править. */
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto;
     align-items: center;
     gap: 11px;
     min-height: 72px;
@@ -958,6 +1013,7 @@ body.mnema-popup-open { overflow: hidden; }
 .mnema-calendar-list-title span { display: flex; align-items: center; gap: 6px; }
 .mnema-calendar-list-title i { color: var(--mnema-accent); }
 .mnema-calendar-list-title b { font-size: 9px; font-weight: 500; opacity: 0.7; }
+.mnema-calendar-list-title .mnema-section-edit { margin-left: 0; padding: 0 0 0 4px; font-size: 11px; }
 .mnema-calendar-items { display: grid; gap: 6px; }
 
 .mnema-birthday-item,
@@ -1569,6 +1625,9 @@ html[data-mnema-lang="en"] .mes.mnema-arc-message .ch_name .name_text::after { c
 .mnema-ib-relationship-content { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--SmartThemeBorderColor, #fff2); }
 .mnema-ib-relationship-content > .mnema-ib-note { margin: 0 0 12px; }
 .mnema-ib-relationship-content > .mnema-ib-meters { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; }
+.mnema-ib-relationship-content > .mnema-ib-next-step b { opacity: .85; }
+.mnema-ib-relationship-content > .mnema-ib-next-step > i { margin-right: 2px; color: var(--ib-accent); font-size: 0.85em; }
+.mnema-ib-relationship-heading > .mnema-ib-tag { flex: 0 0 auto; }
 .mnema-ib-meter.trust { --meter-color: #82b9dc; }
 .mnema-ib-meter.passion { --meter-color: #de8b94; }
 .mnema-ib-meter.devotion { --meter-color: #d6bc7c; }
@@ -1581,6 +1640,9 @@ html[data-mnema-lang="en"] .mes.mnema-arc-message .ch_name .name_text::after { c
 .mnema-ib-date-tile small { font-size: 0.75em; }
 .mnema-ib-reminder > div:last-child { min-width: 0; }
 .mnema-ib-reminder h6 { margin-bottom: 4px; }
+.mnema-ib-head-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.mnema-ib-head-row .mnema-ib-icon { margin: -6px 0; }
+.mnema-ib-secret-tools { display: flex; align-items: center; gap: 2px; }
 .mnema-ib-reminder strong { font-weight: 500; }
 .mnema-ib-reminder > div > small { display: block; margin-top: 3px; opacity: 0.65; font-size: 0.8em; }
 .mnema-ib-body .mnema-ib-list li { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 6px 0; }

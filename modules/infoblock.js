@@ -3,7 +3,7 @@ import { escapeHtml } from './utils.js';
 import { applySecretsUpdate, normalizeClock } from './state.js';
 import { galleryEnabled } from './gallery-data.js';
 import { dateFromIso, formatCalendarDate } from './calendar.js';
-import { nearestStoryPlan } from './prompts.js';
+import { nearestStoryPlan, rungTitle } from './prompts.js';
 
 // Режим «инфоблок»: основная модель чата дописывает в конец ответа одну строку
 // [MN: ...], мы её разбираем, вырезаем из текста сообщения (в контекст она уже
@@ -103,6 +103,22 @@ export function stripSceneTag(text) {
     return String(text || '').replace(new RegExp(TAG.source, 'gi'), '').replace(/[ \t]+$/gm, '').replace(/\n{3,}$/, '\n').trimEnd();
 }
 
+export function hasSceneTag(text) {
+    return TAG.test(String(text || ''));
+}
+
+// Разбирать только message.mes нельзя: соседние расширения держат свою копию
+// ответа (display_text, текущий свайп) и переписывают mes целиком — метка тогда
+// остаётся видимой, но до разбора не доходит. Берём первую копию, где она есть.
+export function sceneTagSource(message) {
+    if (!message) return '';
+    const swipe = Array.isArray(message.swipes) && Number.isInteger(message.swipe_id) ? message.swipes[message.swipe_id] : null;
+    for (const text of [message.mes, message.extra?.display_text, swipe]) {
+        if (hasSceneTag(text)) return String(text);
+    }
+    return '';
+}
+
 // Метка живёт не только в message.mes. ST рисует сообщение из display_text,
 // если его выставил перевод или regex-скрипт «только отображение», а в контекст
 // уходит текущий свайп — почистить надо все три копии, иначе метка останется
@@ -110,12 +126,15 @@ export function stripSceneTag(text) {
 export function stripSceneTagFromMessage(message) {
     if (!message) return false;
     const before = message.mes;
+    const displayBefore = message.extra?.display_text;
     message.mes = stripSceneTag(message.mes);
     if (Array.isArray(message.swipes) && Number.isInteger(message.swipe_id) && message.swipes.length > message.swipe_id) {
         message.swipes[message.swipe_id] = message.mes;
     }
-    if (message.extra?.display_text) message.extra.display_text = stripSceneTag(message.extra.display_text);
-    return message.mes !== before;
+    if (displayBefore) message.extra.display_text = stripSceneTag(displayBefore);
+    // Чужая копия ответа тоже считается изменением: метка могла остаться только
+    // в ней, и без перерисовки она так и висела бы в чате.
+    return message.mes !== before || message.extra?.display_text !== displayBefore;
 }
 
 export function readStoredScene(message) {
@@ -137,7 +156,16 @@ export function applySceneToState(state, scene, settings, messageIndex) {
         state.world[key] = value;
         changed = true;
     };
-    setWorld('clock', scene.clock);
+    // Метка описывает конкретное сообщение, поэтому вместе со временем
+    // запоминаем его номер: разбор более раннего интервала не должен потом
+    // отмотать часы назад.
+    if (scene.clock && (state.world.clockIndex === null || messageIndex >= state.world.clockIndex)) {
+        if (state.world.clock !== scene.clock) {
+            state.world.clock = scene.clock;
+            changed = true;
+        }
+        state.world.clockIndex = messageIndex;
+    }
     if (scene.location && scene.location.toLowerCase() !== String(state.world.location).toLowerCase()) {
         state.world.location = scene.location;
         state.world.description = '';
@@ -199,7 +227,7 @@ function secretsSection(state, peek) {
         const revealed = secrets.filter(secret => secret.revealed).length;
         const percent = secrets.length ? Math.round(revealed / secrets.length * 100) : 0;
         const visible = secrets.filter(secret => !hidden || secret.revealed || peek);
-        return `<section class="mnema-ib-secret-column"><h6><span><i class="fa-solid ${icon}" aria-hidden="true"></i> ${escapeHtml(name)}</span><button type="button" class="mnema-ib-action mnema-ib-icon" data-mnema-ib="add-secret" title="Добавить секрет" aria-label="Добавить секрет: ${escapeHtml(name)}" aria-expanded="false"><i class="fa-solid fa-plus" aria-hidden="true"></i></button></h6>
+        return `<section class="mnema-ib-secret-column"><h6><span><i class="fa-solid ${icon}" aria-hidden="true"></i> ${escapeHtml(name)}</span><span class="mnema-ib-secret-tools"><button type="button" class="mnema-ib-action mnema-ib-icon" data-mnema-focus="secrets" data-focus-owner="${hidden ? 'char' : 'user'}" title="Придумать секреты" aria-label="Придумать секреты: ${escapeHtml(name)}"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></button><button type="button" class="mnema-ib-action mnema-ib-icon" data-mnema-ib="add-secret" title="Добавить секрет" aria-label="Добавить секрет: ${escapeHtml(name)}" aria-expanded="false"><i class="fa-solid fa-plus" aria-hidden="true"></i></button></span></h6>
             <form class="mnema-ib-secret-form" data-owner="${hidden ? 'char' : 'user'}" hidden><textarea name="secret" rows="3" maxlength="600" required aria-label="Новый секрет" placeholder="Новый секрет…"></textarea><div><button type="submit" class="mnema-ib-action">Добавить</button><button type="button" class="mnema-ib-action" data-mnema-ib="cancel-secret">Отмена</button></div></form>
             ${secrets.length ? meter(`Раскрыто ${revealed} из ${secrets.length}`, percent) : '<p class="mnema-ib-note">Секретов пока нет</p>'}
             ${visible.length ? `<ul class="mnema-ib-list">${visible.map(line).join('')}</ul>` : ''}
@@ -230,15 +258,22 @@ function statusRows(state, settings, peek) {
     }
     if (settings.trackRelationships && state.relationship.updatedAt) {
         const relationship = state.relationship;
+        const phase = rungTitle(relationship);
         rows.push(`<section class="mnema-ib-section mnema-ib-relationship"><details class="mnema-ib-relationship-details" data-mnema-details="relationship">
-            <summary title="Подробности отношений"><div class="mnema-ib-relationship-heading"><i class="fa-regular fa-heart" aria-hidden="true"></i><strong>${escapeHtml(relationship.stage || 'Отношения')}</strong><i class="fa-solid fa-chevron-down mnema-ib-chevron" aria-hidden="true"></i></div>${meter('Прогресс фазы', relationship.progress)}</summary>
+            <summary title="Подробности отношений"><div class="mnema-ib-relationship-heading"><i class="fa-regular fa-heart" aria-hidden="true"></i><strong>${escapeHtml(relationship.stage || 'Отношения')}</strong>${phase ? `<span class="mnema-ib-tag">${escapeHtml(phase)}</span>` : ''}<i class="fa-solid fa-chevron-down mnema-ib-chevron" aria-hidden="true"></i></div>${meter('Прогресс фазы', relationship.progress)}</summary>
             <div class="mnema-ib-relationship-content">${relationship.behavior ? `<p class="mnema-ib-note">${escapeHtml(relationship.behavior)}</p>` : ''}
+            ${relationship.nextStep ? `<p class="mnema-ib-note mnema-ib-next-step"><i class="fa-solid fa-arrow-right-long" aria-hidden="true"></i> <b>Следующий шаг:</b> ${escapeHtml(relationship.nextStep)}</p>` : ''}
             <div class="mnema-ib-meters">${[['trust', 'Доверие'], ['passion', 'Страсть'], ['devotion', 'Преданность'], ['attachment', 'Привязанность']].map(([key, label]) => meter(label, relationship[key], key)).join('')}</div></div></details></section>`);
     }
     if (settings.trackCalendar) {
         const plan = nearestStoryPlan(state.calendar, state.world.clock);
         const date = dateFromIso(plan?.date);
-        if (plan) rows.push(`<section class="mnema-ib-section mnema-ib-reminder"><div class="mnema-ib-date-tile">${date ? `<b>${date.getDate()}</b><small>${escapeHtml(date.toLocaleDateString('ru-RU', { month: 'short' }))}</small>` : '<i class="fa-regular fa-calendar"></i>'}</div><div><h6><i class="fa-regular fa-bell"></i> Ближайший план</h6><strong>${escapeHtml(plan.title)}</strong><small>${escapeHtml([date ? formatCalendarDate(date) : 'Дата не задана', plan.time].filter(Boolean).join(' · '))}</small>${plan.details ? `<p class="mnema-ib-note">${escapeHtml(plan.details)}</p>` : ''}</div></section>`);
+        const heading = `<h6 class="mnema-ib-head-row"><span><i class="fa-regular fa-bell"></i> Ближайший план</span><button type="button" class="mnema-ib-action mnema-ib-icon" data-mnema-focus="plans" title="Придумать поводы пересечься" aria-label="Придумать поводы пересечься"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></button></h6>`;
+        // Раздел рисуем и с пустым календарём: кнопка «придумать» нужна ровно
+        // тогда, когда планов ещё нет.
+        rows.push(plan
+            ? `<section class="mnema-ib-section mnema-ib-reminder"><div class="mnema-ib-date-tile">${date ? `<b>${date.getDate()}</b><small>${escapeHtml(date.toLocaleDateString('ru-RU', { month: 'short' }))}</small>` : '<i class="fa-regular fa-calendar"></i>'}</div><div>${heading}<strong>${escapeHtml(plan.title)}</strong><small>${escapeHtml([date ? formatCalendarDate(date) : 'Дата не задана', plan.time].filter(Boolean).join(' · '))}</small>${plan.details ? `<p class="mnema-ib-note">${escapeHtml(plan.details)}</p>` : ''}</div></section>`
+            : `<section class="mnema-ib-section">${heading}<p class="mnema-ib-note">Планов пока нет</p></section>`);
     }
     if (settings.trackSecrets) rows.push(secretsSection(state, peek));
     return rows.join('');
@@ -254,7 +289,7 @@ function actions(settings, busy = false) {
     add('edit', 'fa-pen', 'Редактировать');
     if (settings.collectGallery && galleryEnabled(settings, 'memory')) add('memory', 'fa-camera-retro', 'Сохранить воспоминание');
     if (settings.collectGallery && galleryEnabled(settings, 'item')) add('item', 'fa-gem', 'Сохранить предмет');
-    add('analyze', 'fa-wand-magic-sparkles', 'Анализировать сцену');
+    add('analyze', 'fa-wand-magic-sparkles', 'Проверить новое, иначе перечитать интервал');
     add('open', 'fa-sliders', 'Открыть Mnema');
     return buttons.join('');
 }

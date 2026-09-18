@@ -44,7 +44,12 @@ export function createRenderer({ getState, getSettings, isProcessing, candidateI
         $('#mnema_status_text').text(isProcessing() ? t('Mnema анализирует…')
             : settings.enabled ? t('До следующей проверки: {n}', { n: Math.max(0, settings.interval - unprocessed) })
                 : t('Mnema выключена'));
-        $('#mnema_analyze_now').prop('disabled', isProcessing() || unprocessed === 0);
+        // Кнопка работает и без новых сообщений: тогда она перечитывает
+        // последний интервал. Гасим её, только когда нечего и перечитывать.
+        const recheckable = Boolean(notes.length);
+        $('#mnema_analyze_now')
+            .prop('disabled', isProcessing() || (unprocessed === 0 && !recheckable))
+            .attr('title', unprocessed === 0 && recheckable ? t('Перечитать последний интервал заново') : t('Проверить новые сообщения'));
         renderManual(state, chat);
         renderScene(state);
         renderWorld(state);
@@ -78,7 +83,7 @@ export function createRenderer({ getState, getSettings, isProcessing, candidateI
         }
     
         const relationship = state?.relationship;
-        const hasRelationship = Boolean(settings.trackRelationships && relationship && (relationship.progress || relationship.stage !== 'Не определено'));
+        const hasRelationship = Boolean(settings.trackRelationships && relationship && (relationship.progress || relationship.phase || relationship.ladder?.length || relationship.stage !== 'Не определено'));
         $('#mnema_overview_relationship').prop('hidden', !hasRelationship);
         if (hasRelationship) {
             const people = getParticipantVisuals();
@@ -90,7 +95,8 @@ export function createRenderer({ getState, getSettings, isProcessing, candidateI
             }
             $('#mnema_overview_relationship_stage').text(relationship.stage);
             $('#mnema_overview_relationship_fill').css('width', `${relationship.progress}%`);
-            $('#mnema_overview_relationship_value').text(t('{n}% общего прогресса', { n: relationship.progress }));
+            const rung = (relationship.ladder || []).find(item => item.id === relationship.phase);
+            $('#mnema_overview_relationship_value').text([rung?.title, t('{n}% общего прогресса', { n: relationship.progress })].filter(Boolean).join(' · '));
         }
     
         const secrets = state?.secrets;
@@ -226,6 +232,23 @@ export function createRenderer({ getState, getSettings, isProcessing, candidateI
         return { charName, userName, charAvatar, userAvatar };
     }
     
+    // Лестница целиком, а не одна подпись: видно и пройденное, и то, что впереди,
+    // поэтому пропущенная ступень сразу бросается в глаза. Ступени приходят из
+    // состояния чата — у каждой истории они свои.
+    function renderPhaseTrack(relationship) {
+        const ladder = relationship.ladder || [];
+        $('#mnema_relationship_phase').prop('hidden', !ladder.length);
+        const currentIndex = ladder.findIndex(rung => rung.id === relationship.phase);
+        $('#mnema_relationship_phase_track').html(ladder.map((rung, index) => {
+            // Ступень выше текущей, но уже прожитая, — это откат: история там
+            // была, и гасить её как «впереди» было бы враньём.
+            const status = index === currentIndex ? 'current' : (currentIndex >= 0 && index < currentIndex) || rung.reached ? 'passed' : 'ahead';
+            return `<li class="mnema-phase-step" data-state="${status}"${rung.note ? ` title="${escapeHtml(rung.note)}"` : ''}>${escapeHtml(rung.title)}</li>`;
+        }).join(''));
+        $('#mnema_relationship_next').prop('hidden', !relationship.nextStep);
+        $('#mnema_relationship_next_text').text(relationship.nextStep || '');
+    }
+
     function renderRelationship(state) {
         const relationship = state?.relationship || normalizeRelationship(null);
         const people = getParticipantVisuals();
@@ -238,6 +261,7 @@ export function createRenderer({ getState, getSettings, isProcessing, candidateI
             image.parent().attr('data-initial', String(name).trim().charAt(0).toUpperCase() || '?');
         }
         $('#mnema_relationship_stage').text(relationship.stage);
+        renderPhaseTrack(relationship);
         $('#mnema_relationship_progress_value').text(`${relationship.progress}%`);
         $('#mnema_relationship_progress_fill').css('width', `${relationship.progress}%`);
         $('#mnema_relationship_metrics').html(RELATIONSHIP_METRICS.map(([key, label, icon]) => {

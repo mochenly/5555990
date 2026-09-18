@@ -5,7 +5,13 @@ import { escapeHtml, notify } from './utils.js';
 const field = (key, label, type = 'text', options = null) => ({ key, label, type, options });
 const SECTIONS = {
     world: { title: 'Мир и одежда', fields: [field('location', 'Локация'), field('description', 'Описание локации', 'textarea'), field('clock', 'Время', 'time'), field('timeOfDay', 'Время суток'), field('indoor', 'Обстановка', 'select', [['', 'Неизвестно'], ['true', 'Внутри'], ['false', 'Снаружи']]), field('weather', 'Погода'), field('temperature', 'Температура, °C', 'number'), field('characterOutfit', 'Одежда персонажа', 'textarea'), field('userOutfit', 'Одежда персоны', 'textarea')] },
-    relationship: { title: 'Отношения', fields: [field('stage', 'Фаза отношений'), field('behavior', 'Как отношение влияет на поведение', 'textarea'), ...['progress', 'trust', 'passion', 'devotion', 'attachment'].map((key, i) => field(key, ['Прогресс', 'Доверие', 'Страсть', 'Преданность', 'Привязанность'][i] + ', 0–100', 'percent'))] },
+    relationship: {
+        title: 'Отношения',
+        // Список ступеней редактируется как обычный список записей, а текущая
+        // ступень — выбор из него же, поэтому варианты собираются из черновика.
+        fields: [field('phase', 'Текущая ступень', 'select', draft => [['', 'Не определена'], ...(draft.ladder || []).map(rung => [rung.id, rung.title])]), field('nextStep', 'Следующий шаг в отношениях', 'textarea'), field('stage', 'Стадия отношений'), field('behavior', 'Как отношение влияет на поведение', 'textarea'), ...['progress', 'trust', 'passion', 'devotion', 'attachment'].map((key, i) => field(key, ['Прогресс', 'Доверие', 'Страсть', 'Преданность', 'Привязанность'][i] + ', 0–100', 'percent'))],
+        lists: [{ key: 'ladder', title: 'Ступени этой истории', fields: [field('title', 'Название ступени'), field('note', 'Что она означает', 'textarea')] }],
+    },
     health: { title: 'Здоровье', fields: [field('satiety.value', 'Сытость, 0–100', 'percent'), field('satiety.label', 'Описание сытости'), field('energy.value', 'Энергия, 0–100', 'percent'), field('energy.label', 'Описание энергии'), field('mood.label', 'Настроение'), field('mood.tone', 'Тон настроения', 'select', [['', 'Не указан'], ['positive', 'Положительный'], ['neutral', 'Нейтральный'], ['negative', 'Отрицательный']])], lists: [{ key: 'injuries', title: 'Травмы и состояния', fields: [field('name', 'Название'), field('severity', 'Тяжесть', 'select', [['minor', 'Лёгкая'], ['moderate', 'Средняя'], ['severe', 'Тяжёлая']]), field('details', 'Симптомы, ограничения, лечение', 'textarea')] }] },
     calendar: { title: 'Календарь', fields: [field('currentDate', 'Сюжетная дата', 'date')], lists: [{ key: 'plans', title: 'Планы', fields: [field('title', 'Название'), field('date', 'Дата', 'date'), field('time', 'Время', 'time'), field('details', 'Подробности', 'textarea')] }, { key: 'birthdays', title: 'Дни рождения', fields: [field('person', 'Имя'), field('monthDay', 'Месяц-день, например 03-08'), field('note', 'Заметка', 'textarea')] }] },
     secrets: { title: 'Секреты', lists: [{ key: 'entries', title: 'Секреты персонажей', fields: [field('title', 'Название'), field('summary', 'Содержание и кто знает', 'textarea'), field('owner', 'Чей секрет', 'select', [['char', 'Персонажа'], ['user', 'Персоны']]), field('revealed', 'Статус', 'select', [['false', 'Не раскрыт'], ['true', 'Раскрыт']])] }] },
@@ -31,7 +37,10 @@ export function createSectionEditor({ getState, isBusy, onSaved }) {
         const text = value === null || value === undefined ? '' : String(value);
         let control;
         if (def.type === 'textarea') control = `<textarea class="text_pole" rows="4" ${attrs}>${escapeHtml(text)}</textarea>`;
-        else if (def.type === 'select') control = `<select class="text_pole" ${attrs}>${def.options.map(([key, label]) => `<option value="${key}" ${text === key ? 'selected' : ''}>${label}</option>`).join('')}</select>`;
+        else if (def.type === 'select') {
+            const options = typeof def.options === 'function' ? def.options(session.draft) : def.options;
+            control = `<select class="text_pole" ${attrs}>${options.map(([key, label]) => `<option value="${key}" ${text === key ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('')}</select>`;
+        }
         else control = `<input class="text_pole" type="${def.type === 'percent' ? 'number' : def.type}" ${def.type === 'percent' ? 'min="0" max="100"' : ''} ${attrs} value="${escapeHtml(text)}">`;
         return `<label class="mnema-edit-field">${def.label}${control}</label>`;
     }
@@ -101,6 +110,9 @@ export function createSectionEditor({ getState, isBusy, onSaved }) {
         if (section === 'secrets') value = { revealed: draft.entries.filter(item => item.revealed).map(({ revealed, ...item }) => item), unrevealed: draft.entries.filter(item => !item.revealed).map(({ revealed, ...item }) => item) };
         if (section === 'arcs') value = draft.entries;
         if (section === 'world' || section === 'relationship') value.updatedAt = new Date().toISOString();
+        // Правка руками — самый свежий источник времени: помечаем её концом
+        // чата, иначе отставший анализ перебьёт только что выставленные часы.
+        if (section === 'world') value.clockIndex = Math.max(0, context.chat.length - 1);
         if (section === 'relationship') value.trends = {};
         if (section === 'health') {
             for (const key of ['satiety', 'energy']) if (value[key]?.value === null) value[key] = null;

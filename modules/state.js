@@ -1,6 +1,6 @@
 import { getContext } from '/scripts/extensions.js';
 import { getCurrentChatId } from '/script.js';
-import { RELATIONSHIP_METRICS, STATE_KEY } from './config.js';
+import { RELATIONSHIP_LADDER_LIMIT, RELATIONSHIP_METRICS, RELATIONSHIP_RUNG_NOTE_LIMIT, RELATIONSHIP_RUNG_TITLE_LIMIT, STATE_KEY } from './config.js';
 import { clampPercent } from './utils.js';
 import { galleryEnabled } from './gallery-data.js';
 
@@ -13,9 +13,9 @@ export function createState(chat) {
         secrets: { revealed: [], unrevealed: [] },
         calendar: { currentDate: null, sourceMessageIndex: null, viewOffsetWeeks: 0, birthdays: [], plans: [] },
         health: { satiety: null, energy: null, mood: null, injuries: [] },
-        relationship: { stage: 'Не определено', behavior: '', progress: 0, trust: 0, passion: 0, devotion: 0, attachment: 0, trends: {}, updatedAt: null },
+        relationship: { ladder: [], phase: '', nextStep: '', stage: 'Не определено', behavior: '', progress: 0, trust: 0, passion: 0, devotion: 0, attachment: 0, trends: {}, updatedAt: null },
         gallery: { memories: [], items: [] },
-        world: { location: '', description: '', characterOutfit: '', userOutfit: '', indoor: null, clock: '', timeOfDay: '', weather: '', temperature: null, updatedAt: null },
+        world: { location: '', description: '', characterOutfit: '', userOutfit: '', indoor: null, clock: '', clockIndex: null, timeOfDay: '', weather: '', temperature: null, updatedAt: null },
     };
 }
 
@@ -55,6 +55,9 @@ export function normalizeState(state, chat) {
     state.world.userOutfit = String(state.world.userOutfit || '').trim().slice(0, 1200);
     state.world.indoor = typeof state.world.indoor === 'boolean' ? state.world.indoor : null;
     state.world.clock = normalizeClock(state.world.clock);
+    // Номер сообщения, из которого взято время. Уехал за пределы чата после
+    // удаления или ветвления — забываем: иначе он навсегда заблокирует часы.
+    state.world.clockIndex = Number.isInteger(state.world.clockIndex) && state.world.clockIndex < chat.length ? state.world.clockIndex : null;
     state.world.timeOfDay = String(state.world.timeOfDay || '').trim().slice(0, 40);
     state.world.weather = String(state.world.weather || '').trim().slice(0, 60);
     state.world.temperature = state.world.temperature !== null && state.world.temperature !== '' && Number.isFinite(Number(state.world.temperature)) ? Math.round(Number(state.world.temperature)) : null;
@@ -199,9 +202,62 @@ function normalizeVital(vital) {
     return { value: Math.round(Math.max(0, Math.min(100, value))), label: String(data.label || '').trim() };
 }
 
+const rungKey = title => String(title || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+// id ступени живёт только внутри чата: он нужен, чтобы переименование ступени в
+// редакторе не сбрасывало текущую позицию на лестнице.
+function normalizeLadder(value) {
+    const source = (Array.isArray(value) ? value : []).map(item => {
+        const rung = typeof item === 'string' ? { title: item } : (item || {});
+        return {
+            id: String(rung.id || '').trim().slice(0, 40),
+            title: String(rung.title || rung.label || rung.name || '').trim().slice(0, RELATIONSHIP_RUNG_TITLE_LIMIT),
+            note: String(rung.note || rung.hint || rung.description || '').trim().slice(0, RELATIONSHIP_RUNG_NOTE_LIMIT),
+            // Ступень, на которой история уже побывала. Отсюда — граница, ниже
+            // которой лестницу переписывать нельзя.
+            reached: Boolean(rung.reached),
+        };
+    }).filter(rung => rung.title);
+
+    // Повтор ступени превращает лестницу в петлю, поэтому одинаковые названия
+    // схлопываем, сохраняя первое вхождение и его порядок.
+    const seen = new Set();
+    const rungs = source.filter(rung => {
+        const key = rungKey(rung.title);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    }).slice(0, RELATIONSHIP_LADDER_LIMIT);
+
+    const taken = new Set(rungs.map(rung => rung.id).filter(Boolean));
+    let counter = 0;
+    for (const rung of rungs) {
+        if (rung.id) continue;
+        while (taken.has(`r${++counter}`));
+        rung.id = `r${counter}`;
+        taken.add(rung.id);
+    }
+    return rungs;
+}
+
+export const findRung = (ladder, reference) => {
+    const value = String(reference || '').trim();
+    if (!value) return -1;
+    const byId = ladder.findIndex(rung => rung.id === value);
+    return byId >= 0 ? byId : ladder.findIndex(rung => rungKey(rung.title) === rungKey(value));
+};
+
 export function normalizeRelationship(value) {
     const source = value && typeof value === 'object' ? value : {};
+    const ladder = normalizeLadder(source.ladder || source.phases);
+    const phaseIndex = findRung(ladder, source.phase);
+    // Стоять на ступени, не пройдя предыдущие, история не может — отмечаем всё
+    // до текущей включительно, даже если пометка пришла неполной.
+    for (let index = 0; index <= phaseIndex; index++) ladder[index].reached = true;
     const relationship = {
+        ladder,
+        phase: phaseIndex >= 0 ? ladder[phaseIndex].id : '',
+        nextStep: String(source.nextStep || source.next_step || '').trim().slice(0, 400),
         stage: String(source.stage || source.status || 'Не определено').slice(0, 80),
         behavior: String(source.behavior || '').trim().slice(0, 1200),
         progress: clampPercent(source.progress),
@@ -236,13 +292,73 @@ function normalizeGalleryEntries(entries, kind) {
     }).filter(Boolean).slice(0, 50);
 }
 
+// Пройденное — уже история, и переписывать её новым разбором нельзя: ступени по
+// самую верхнюю, где история побывала, остаются как есть, у них обновляется
+// только пояснение. Граница именно по побывавшей, а не по текущей: после ссоры
+// отношения падают вниз, но прожитое от этого не исчезает. Всё, что выше, модель
+// вправе перерисовать целиком — в том числе вставить между двумя ступенями
+// третью, если сюжет показал промежуточную.
+function mergeLadder(previous, phase, incoming) {
+    if (!Array.isArray(incoming) || !incoming.length) return null;
+    const lastReached = previous.map(rung => rung.reached).lastIndexOf(true);
+    const history = previous.slice(0, Math.max(lastReached, findRung(previous, phase)) + 1);
+    const known = new Map(history.map(rung => [rungKey(rung.title), rung]));
+    const ahead = [];
+    for (const item of incoming) {
+        const source = typeof item === 'string' ? { title: item } : (item || {});
+        const title = String(source.title || source.label || source.name || '').trim();
+        const note = String(source.note || source.hint || source.description || '').trim();
+        if (!title) continue;
+        const rung = known.get(rungKey(title));
+        if (rung) { if (note) rung.note = note; continue; }
+        const fresh = { id: '', title, note };
+        known.set(rungKey(title), fresh);
+        ahead.push(fresh);
+    }
+    return [...history, ...ahead];
+}
+
+// Разбор длинного куска истории легко перепрыгивает через ступень: модель видит
+// итог и записывает его, а промежуточная так и не случается в памяти. Поэтому
+// вперёд пускаем ровно на одну ступень за анализ. Первая запись — исключение: до
+// неё лестницы ещё нет, и разбор всего чата обязан сразу встать туда, куда
+// история дошла. Движение вниз — хоть с верхней ступени на нижнюю: разрыв и
+// охлаждение случаются разом, и придумывать для них отдельную ветку незачем.
+function advance(ladder, previousPhase, target) {
+    const to = findRung(ladder, target);
+    if (to < 0) return null;
+    const from = findRung(ladder, previousPhase);
+    if (from < 0 || to <= from) return ladder[to].id;
+    return ladder[Math.min(to, from + 1)].id;
+}
+
 export function applyRelationshipUpdate(state, update, settings) {
     if (!settings.trackRelationships || !update || typeof update !== 'object') return;
     const previous = state.relationship;
     const patch = {};
+
+    let ladder = mergeLadder(previous.ladder, previous.phase, update.ladder || update.phases);
+    if (ladder) patch.ladder = ladder;
+    ladder = normalizeRelationship({ ...previous, ...patch }).ladder;
+    // Модель назвала ступень, которой на лестнице нет: это не ошибка, а ещё не
+    // записанная ступень — ставим её сразу за текущей, чтобы позиция не потерялась.
+    const requested = String(update.phase || '').trim();
+    if (requested && findRung(ladder, requested) < 0) {
+        const inserted = [...ladder];
+        inserted.splice(findRung(ladder, previous.phase) + 1, 0, { title: requested });
+        ladder = normalizeRelationship({ ...previous, ladder: inserted }).ladder;
+        patch.ladder = ladder;
+    }
+    const phase = requested ? advance(ladder, previous.phase, requested) : null;
+    if (phase && phase !== previous.phase) patch.phase = phase;
+    const nextStep = typeof update.next_step === 'string' ? update.next_step : update.nextStep;
+    if (typeof nextStep === 'string' && nextStep.trim()) patch.nextStep = nextStep.trim();
+    // Следующий шаг всегда относится к текущей фазе: сменилась фаза — старый шаг
+    // уже пройден, и лучше пустое поле, чем описание вчерашнего порога.
+    else if (patch.phase) patch.nextStep = '';
     if (typeof update.stage === 'string' && update.stage.trim()) patch.stage = update.stage.trim();
     if (typeof update.behavior === 'string' && update.behavior.trim()) patch.behavior = update.behavior.trim();
-    else if (patch.stage && patch.stage !== previous.stage) patch.behavior = '';
+    else if ((patch.stage && patch.stage !== previous.stage) || patch.phase) patch.behavior = '';
     for (const key of ['progress', ...RELATIONSHIP_METRICS.map(([metric]) => metric)]) {
         if (typeof update[key] === 'number' && Number.isFinite(update[key])) patch[key] = update[key];
     }
@@ -321,7 +437,15 @@ export function applySecretsUpdate(state, update, settings) {
     }
 }
 
-export function applyWorldUpdate(state, update) {
+/**
+ * @param {number|null} messageIndex номер последнего сообщения, которое видел
+ * источник обновления. Нужен только часам: остальные поля кумулятивны, а время
+ * монотонно, и отставший источник не должен отматывать его назад.
+ * @param {boolean} tieWins побеждает ли этот источник при равном номере. Метка
+ * инфоблока идёт по каждому сообщению и точнее оценки анализа, поэтому при
+ * включённом инфоблоке ничья остаётся за ней.
+ */
+export function applyWorldUpdate(state, update, messageIndex = null, { tieWins = true } = {}) {
     if (!update || typeof update !== 'object') return;
     const location = String(update.location || '').trim().slice(0, 120);
     const locationChanged = location && location.toLowerCase() !== state.world.location.toLowerCase();
@@ -339,8 +463,17 @@ export function applyWorldUpdate(state, update) {
         if (typeof outfit === 'string' && outfit.trim()) state.world[key] = outfit.trim().slice(0, 1200);
     }
     if (typeof update.indoor === 'boolean') state.world.indoor = update.indoor;
+    // Анализ идёт по пачке сообщений и почти всегда отстаёт от чата: метка
+    // инфоблока уже записала время из свежего ответа, а разбор старого
+    // интервала вернул бы стрелки назад. Побеждает источник, который видел чат
+    // дальше; без известного номера сообщения оставляем прежнюю пометку.
     const clock = normalizeClock(update.clock ?? update.time);
-    if (clock) state.world.clock = clock;
+    const recorded = state.world.clockIndex;
+    const fresher = messageIndex === null || recorded === null || (tieWins ? messageIndex >= recorded : messageIndex > recorded);
+    if (clock && fresher) {
+        state.world.clock = clock;
+        state.world.clockIndex = messageIndex ?? state.world.clockIndex;
+    }
     const timeOfDay = String(update.time_of_day || update.timeOfDay || '').trim().slice(0, 40);
     if (timeOfDay) state.world.timeOfDay = timeOfDay;
     const weather = String(update.weather || '').trim().slice(0, 60);
