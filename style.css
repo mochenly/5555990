@@ -1427,6 +1427,35 @@ body.mnema-popup-open { overflow: hidden; }
 /* Псевдоэлемент наблюдателем перевода не берётся — язык приходит атрибутом. */
 html[data-mnema-lang="en"] .mes.mnema-arc-message .ch_name .name_text::after { content: ' · story memory'; }
 
+/* Исходные сообщения арки из чата не удаляются: на них лежат снимки состояния
+   и по ним идёт пересчёт всего чата. В ленте их заменяет полоска-раскрывашка. */
+#chat .mes.mnema-arc-source:not(.mnema-arc-unfolded) { display: none; }
+
+#chat .mnema-arc-fold {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 6px 10px;
+    padding: 7px 12px;
+    border: 1px dashed color-mix(in srgb, var(--SmartThemeQuoteColor) 45%, transparent);
+    border-radius: 10px;
+    color: color-mix(in srgb, var(--SmartThemeBodyColor) 62%, transparent);
+    font-size: 0.82em;
+    cursor: pointer;
+    user-select: none;
+    transition: background 160ms ease, color 160ms ease;
+}
+
+#chat .mnema-arc-fold:hover {
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor) 12%, transparent);
+    color: var(--SmartThemeBodyColor);
+}
+
+#chat .mnema-arc-fold i { transition: transform 160ms ease; }
+#chat .mnema-arc-fold.open i { transform: rotate(90deg); }
+
+#chat .mes.mnema-arc-unfolded { opacity: 0.6; }
+
 @media (max-width: 700px) {
     .mnema-popup { align-items: end; padding: 8px; }
     .mnema-popup-card { width: 100%; height: min(720px, calc(100dvh - 16px)); min-height: 0; border-radius: 18px; }

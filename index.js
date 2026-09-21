@@ -56,7 +56,7 @@ let manualModels = [];
 let manualModelsSource = '';
 let manualModelsBusy = false;
 
-const { getParticipantVisuals, renderGallery, renderOverview, setSecretPeek, isPeeking } = createRenderer({
+const { getParticipantVisuals, renderGallery, renderOverview, setSecretPeek, isPeeking, peekedOwners } = createRenderer({
     getState,
     getSettings: () => settings,
     isProcessing: () => processing,
@@ -269,7 +269,7 @@ function closePopup() {
     popup.hidden = true;
     document.body.classList.remove('mnema-popup-open');
     // Спойлер закрывается вместе с попапом — иначе тайны «протекают» в чат.
-    if (isPeeking()) { setSecretPeek(false); if (settings.infoblock) decorateInfoblocks(); }
+    if (isPeeking()) { setSecretPeek(null); if (settings.infoblock) decorateInfoblocks(); }
 }
 
 function serializeMessages(chat, indices) {
@@ -319,13 +319,63 @@ function insertArcMessage(chat, state, arc, insertAt) {
     arc.summaryMessageIndex = insertAt;
 }
 
+// Конспект встаёт сразу за последним сообщением арки: он заменяет собой блок,
+// а не открывает его. Иначе в ленте выходит «конспект, а под ним стена
+// свёрнутого прошлого», и следующая живая реплика уезжает вниз.
+function arcInsertPosition(indices) {
+    return Math.max(...indices) + 1;
+}
+
+function arcFoldLabel(arc, count, unfolded) {
+    return unfolded
+        ? t('Свернуть исходные сообщения ({n})', { n: count })
+        : t('Арка «{title}» · {n} сообщений свёрнуто', { title: arc.title, n: count });
+}
+
+// Исходные сообщения арки остаются в чате (на них живут снимки состояния и по
+// ним идёт пересчёт всего чата), но в ленте их заменяет одна полоска.
+function foldArcSources(chatElement, messageElements, state) {
+    const byIndex = new Map(messageElements.map(element => [Number(element.getAttribute('mesid')), element]));
+    const unfoldedArcs = new Set([...chatElement.querySelectorAll('.mnema-arc-fold.open')].map(node => node.dataset.arcId));
+    chatElement.querySelectorAll('.mnema-arc-fold').forEach(node => node.remove());
+    for (const arc of state?.arcs || []) {
+        // Выключенная арка снова отдаёт исходники модели — прятать их в этот
+        // момент значило бы показывать не то, что уходит в промпт.
+        if (arc.active === false) continue;
+        const elements = (arc.messageIndices || []).map(index => byIndex.get(index)).filter(Boolean);
+        if (!elements.length) continue;
+        const unfolded = unfoldedArcs.has(arc.id);
+        for (const element of elements) {
+            element.classList.add('mnema-arc-source');
+            element.classList.toggle('mnema-arc-unfolded', unfolded);
+            element.dataset.mnemaFold = arc.id;
+        }
+        const bar = document.createElement('div');
+        bar.className = unfolded ? 'mnema-arc-fold open' : 'mnema-arc-fold';
+        bar.dataset.arcId = arc.id;
+        bar.innerHTML = `<i class="fa-solid fa-chevron-right"></i><span>${escapeHtml(arcFoldLabel(arc, elements.length, unfolded))}</span>`;
+        elements[0].parentNode.insertBefore(bar, elements[0]);
+    }
+}
+
 function decorateArcMessages() {
+    const chatElement = document.getElementById('chat');
     const chat = getContext()?.chat;
-    if (!Array.isArray(chat)) return;
-    document.querySelectorAll('.mes[mesid]').forEach(element => {
+    if (!chatElement || !Array.isArray(chat)) return;
+    // Поиск строго внутри #chat и только по числовому mesid: у скрытого шаблона
+    // сообщения SillyTavern атрибут mesid пустой, а Number('') === 0. Без этой
+    // проверки класс арки садился на сам шаблон, и его наследовали все
+    // отрисованные позже сообщения — подпись «сюжетная память» расползалась по
+    // всему чату после первой же арки с нулевым сообщением внутри.
+    const messageElements = [...chatElement.querySelectorAll('.mes[mesid]')]
+        .filter(element => /^\d+$/.test(element.getAttribute('mesid') || ''));
+    for (const element of messageElements) {
         const index = Number(element.getAttribute('mesid'));
         element.classList.toggle('mnema-arc-message', Boolean(chat[index]?.extra?.mnema_arc_id));
-    });
+        element.classList.remove('mnema-arc-source', 'mnema-arc-unfolded');
+        delete element.dataset.mnemaFold;
+    }
+    foldArcSources(chatElement, messageElements, getState({ create: false }));
 }
 
 async function migrateArcMessages(chat, state) {
@@ -336,8 +386,10 @@ async function migrateArcMessages(chat, state) {
             arc.summaryMessageIndex = existingIndex;
             continue;
         }
-        const insertAt = Math.max(0, Math.min(...(arc.messageIndices || []).filter(Number.isInteger)));
-        if (!Number.isFinite(insertAt) || !chat[insertAt]) continue;
+        const covered = (arc.messageIndices || []).filter(Number.isInteger);
+        if (!covered.length) continue;
+        const insertAt = arcInsertPosition(covered);
+        if (!Number.isFinite(insertAt) || insertAt > chat.length) continue;
         insertArcMessage(chat, state, arc, insertAt);
         changed = true;
     }
@@ -478,7 +530,7 @@ async function finalizeArc(chat, state, epoch, { reload = true, silent = false }
     if (epoch !== chatEpoch || getContext()?.chat !== chat) throw new Error('Чат сменился во время формирования арки');
     const arc = createArc({ title, summary, indices, notes: state.pending.eventNotes });
     state.arcs.push(arc);
-    insertArcMessage(chat, state, arc, indices[0]);
+    insertArcMessage(chat, state, arc, arcInsertPosition(indices));
     state.pending = { messageIndices: [], eventNotes: [], closeRequested: false };
     await getContext().saveChat();
     await setMessagesHidden(chat, arc.messageIndices, true);
@@ -516,7 +568,7 @@ function renderInfoblockFor(messageIndex) {
     const scene = readStoredScene(message);
     // Replies without updates use the existing state; no missing-tag warning.
     if (!scene && !live) return;
-    renderInfoblock(messageIndex, buildInfoblock({ scene, state: getState({ create: false }), settings, live, busy: Boolean(gallery?.status().busy), peek: isPeeking() }));
+    renderInfoblock(messageIndex, buildInfoblock({ scene, state: getState({ create: false }), settings, live, busy: Boolean(gallery?.status().busy), peek: peekedOwners() }));
 }
 
 function decorateInfoblocks() {
@@ -783,7 +835,7 @@ function applyManualArcs(chat, state, parts) {
     }
     // Register every arc before inserting summaries so all indices shift together.
     state.arcs.push(...arcs);
-    for (const arc of arcs) insertArcMessage(chat, state, arc, arc.messageIndices[0]);
+    for (const arc of arcs) insertArcMessage(chat, state, arc, arcInsertPosition(arc.messageIndices));
     for (const arc of arcs) for (const index of arc.messageIndices) chat[index].is_system = true;
     return arcs.length;
 }
@@ -959,8 +1011,18 @@ function bindEvents() {
         renderCalendar(state);
     });
     $(document).on('click', '.mnema-arc-toggle', function () { void toggleArc(this.closest('.mnema-arc')?.dataset.arcId); });
+    $(document).on('click', '.mnema-arc-fold', function () {
+        const arcId = this.dataset.arcId;
+        if (!arcId) return;
+        const unfolded = this.classList.toggle('open');
+        const elements = document.querySelectorAll(`#chat .mes[data-mnema-fold="${CSS.escape(arcId)}"]`);
+        elements.forEach(element => element.classList.toggle('mnema-arc-unfolded', unfolded));
+        const arc = getState({ create: false })?.arcs?.find(item => item.id === arcId);
+        if (arc) this.querySelector('span').textContent = arcFoldLabel(arc, elements.length, unfolded);
+    });
     $(document).on('click', '.mnema-secret-peek', function () {
-        setSecretPeek(this.dataset.mnemaPeek === 'on');
+        const owner = SECRET_OWNERS.includes(this.dataset.peekOwner) ? this.dataset.peekOwner : 'char';
+        setSecretPeek(owner, this.dataset.mnemaPeek === 'on');
         if (settings.infoblock) decorateInfoblocks();
     });
     $(document).on('change', '#mnema_enabled', function () { settings.enabled = this.checked; saveSettings(); renderOverview(); });
@@ -1008,7 +1070,11 @@ function bindEvents() {
             if (!form.hidden) form.elements.secret.focus();
             return;
         }
-        if (action === 'peek' || action === 'unpeek') { setSecretPeek(action === 'peek'); return decorateInfoblocks(); }
+        if (action === 'peek' || action === 'unpeek') {
+            const owner = SECRET_OWNERS.includes(this.dataset.peekOwner) ? this.dataset.peekOwner : 'char';
+            setSecretPeek(owner, action === 'peek');
+            return decorateInfoblocks();
+        }
         if (action === 'open') return openPopup();
         if (action === 'edit') return sectionEditor.open();
         if (action === 'analyze') return analyzeOrRecheck();
@@ -1090,6 +1156,9 @@ function initialize() {
     // и плашки перерисовываются целиком и часто.
     document.documentElement.setAttribute('data-mnema-lang', isRussianUi() ? 'ru' : 'en');
     observeTranslation([`#${POPUP_ID}`, '#extensionsMenu', '#chat']);
+    // Лечение чатов, открытых старой версией: класс арки мог осесть на скрытом
+    // шаблоне сообщения, и каждая новая реплика клонировалась уже с подписью.
+    document.querySelectorAll('#message_template .mes').forEach(element => element.classList.remove('mnema-arc-message', 'mnema-arc-source', 'mnema-arc-unfolded'));
     bindEvents(); syncSettingsUi(); void onChatChanged();
     eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
     eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, messageId => {

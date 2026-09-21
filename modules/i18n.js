@@ -378,6 +378,8 @@ const EN = {
     ' · текущая арка оставлена открытой': ' · the current arc was left open',
     ' · пропущено {n}': ' · {n} skipped',
     'Арка «{title}» завершена': 'Arc “{title}” is complete',
+    'Арка «{title}» · {n} сообщений свёрнуто': 'Arc “{title}” · {n} messages collapsed',
+    'Свернуть исходные сообщения ({n})': 'Collapse the original messages ({n})',
     'Арка {n}': 'Arc {n}',
     'Нет сообщений для анализа': 'No messages to analyze',
     'Чат сменился, пересчёт отменён': 'The chat changed, the recalculation was cancelled',

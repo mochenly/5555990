@@ -10,8 +10,9 @@ import { galleryEnabled } from './gallery-data.js';
 export function createRenderer({ getState, getSettings, isProcessing, candidateIndices, getGalleryImageConfig, getGalleryStatus = () => ({ expanded: new Set() }) }) {
     const settings = new Proxy({}, { get: (_target, property) => getSettings()?.[property] });
     // Подсматривание в чужие тайны живёт только в текущей сессии: закрыл попап —
-    // спойлер снова закрыт.
-    let peeking = false;
+    // спойлер снова закрыт. Состояние отдельное на каждую категорию: открытые
+    // тайны персонажа не должны заодно раскрывать тайны мира.
+    const peeking = new Set();
 
     function renderOverview() {
         const state = getState({ create: false });
@@ -150,7 +151,7 @@ export function createRenderer({ getState, getSettings, isProcessing, candidateI
         const userSecrets = collectSecrets(state, 'user');
         const worldSecrets = collectSecrets(state, 'world');
         $('#mnema_world_secrets_count').text(worldSecrets.length);
-        $('#mnema_world_secrets').html(renderSecretItems(worldSecrets, { spoil: peeking, peekable: true, emptyText: 'Тайн мира пока нет.' }));
+        $('#mnema_world_secrets').html(renderSecretItems(worldSecrets, { owner: 'world', spoil: peeking.has('world'), peekable: true, emptyText: 'Тайн мира пока нет.' }));
         const charSecrets = collectSecrets(state, 'char');
         const revealedCount = charSecrets.filter(secret => secret.revealed).length;
 
@@ -163,11 +164,11 @@ export function createRenderer({ getState, getSettings, isProcessing, candidateI
             : t('тайн пока нет'));
         $('#mnema_char_secrets_fill').css('width', charSecrets.length ? `${Math.round((revealedCount / charSecrets.length) * 100)}%` : '0%');
         // Свои секреты игрок знает всегда, чужие нераскрытые — только по кнопке.
-        $('#mnema_user_secrets').html(renderSecretItems(userSecrets, { spoil: true, peekable: false, emptyText: 'Своих тайн пока не нашлось.' }));
-        $('#mnema_char_secrets').html(renderSecretItems(charSecrets, { spoil: peeking, peekable: true, emptyText: 'Чужих тайн пока не нашлось.' }));
+        $('#mnema_user_secrets').html(renderSecretItems(userSecrets, { owner: 'user', spoil: true, peekable: false, emptyText: 'Своих тайн пока не нашлось.' }));
+        $('#mnema_char_secrets').html(renderSecretItems(charSecrets, { owner: 'char', spoil: peeking.has('char'), peekable: true, emptyText: 'Чужих тайн пока не нашлось.' }));
     }
 
-    function renderSecretItems(items, { spoil, peekable, emptyText }) {
+    function renderSecretItems(items, { owner, spoil, peekable, emptyText }) {
         if (!items.length) return `<div class="mnema-secret-empty"><i class="fa-solid fa-key"></i><span>${emptyText}</span></div>`;
         const hidden = items.filter(secret => !secret.revealed).length;
         const cards = items.map((secret, index) => {
@@ -183,8 +184,8 @@ export function createRenderer({ getState, getSettings, isProcessing, candidateI
         }).join('');
         const peek = !peekable || !hidden ? ''
             : spoil
-                ? '<button type="button" class="mnema-secret-peek" data-mnema-peek="off"><i class="fa-solid fa-eye-slash"></i> Снова скрыть</button>'
-                : `<button type="button" class="mnema-secret-peek" data-mnema-peek="on"><i class="fa-solid fa-eye"></i> ${t('Показать {n} нераскрытых', { n: hidden })}</button>`;
+                ? `<button type="button" class="mnema-secret-peek" data-mnema-peek="off" data-peek-owner="${owner}"><i class="fa-solid fa-eye-slash"></i> Снова скрыть</button>`
+                : `<button type="button" class="mnema-secret-peek" data-mnema-peek="on" data-peek-owner="${owner}"><i class="fa-solid fa-eye"></i> ${t('Показать {n} нераскрытых', { n: hidden })}</button>`;
         return cards + peek;
     }
     
@@ -321,7 +322,14 @@ export function createRenderer({ getState, getSettings, isProcessing, candidateI
 
     return {
         getParticipantVisuals, renderOverview, renderGallery, renderRelationship,
-        setSecretPeek: value => { peeking = Boolean(value); renderSecrets(getState({ create: false })); },
-        isPeeking: () => peeking,
+        // owner === null снимает спойлер со всех категорий сразу — это закрытие попапа.
+        setSecretPeek: (owner, value) => {
+            if (owner === null || owner === undefined) peeking.clear();
+            else if (value) peeking.add(owner);
+            else peeking.delete(owner);
+            renderSecrets(getState({ create: false }));
+        },
+        isPeeking: owner => (owner === undefined ? peeking.size > 0 : peeking.has(owner)),
+        peekedOwners: () => new Set(peeking),
     };
 }
