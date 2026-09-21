@@ -1,10 +1,11 @@
+import { SECRET_OWNERS, secretLimit, secretCount, sameSecret } from './secrets.js';
 import { getContext } from '/scripts/extensions.js';
 import { normalizeState } from './state.js';
 import { escapeHtml, notify } from './utils.js';
 
 const field = (key, label, type = 'text', options = null) => ({ key, label, type, options });
 const SECTIONS = {
-    world: { title: 'Мир и одежда', fields: [field('location', 'Локация'), field('description', 'Описание локации', 'textarea'), field('clock', 'Время', 'time'), field('timeOfDay', 'Время суток'), field('indoor', 'Обстановка', 'select', [['', 'Неизвестно'], ['true', 'Внутри'], ['false', 'Снаружи']]), field('weather', 'Погода'), field('temperature', 'Температура, °C', 'number'), field('characterOutfit', 'Одежда персонажа', 'textarea'), field('userOutfit', 'Одежда персоны', 'textarea')] },
+    world: { title: 'Мир и одежда', fields: [field('location', 'Локация'), field('description', 'Описание локации', 'textarea'), field('clock', 'Время', 'time'), field('indoor', 'Обстановка', 'select', [['', 'Неизвестно'], ['true', 'Внутри'], ['false', 'Снаружи']]), field('weather', 'Погода'), field('temperature', 'Температура, °C', 'number'), field('characterOutfit', 'Одежда персонажа', 'textarea'), field('userOutfit', 'Одежда персоны', 'textarea')] },
     relationship: {
         title: 'Отношения',
         // Список ступеней редактируется как обычный список записей, а текущая
@@ -14,7 +15,7 @@ const SECTIONS = {
     },
     health: { title: 'Здоровье', fields: [field('satiety.value', 'Сытость, 0–100', 'percent'), field('satiety.label', 'Описание сытости'), field('energy.value', 'Энергия, 0–100', 'percent'), field('energy.label', 'Описание энергии'), field('mood.label', 'Настроение'), field('mood.tone', 'Тон настроения', 'select', [['', 'Не указан'], ['positive', 'Положительный'], ['neutral', 'Нейтральный'], ['negative', 'Отрицательный']])], lists: [{ key: 'injuries', title: 'Травмы и состояния', fields: [field('name', 'Название'), field('severity', 'Тяжесть', 'select', [['minor', 'Лёгкая'], ['moderate', 'Средняя'], ['severe', 'Тяжёлая']]), field('details', 'Симптомы, ограничения, лечение', 'textarea')] }] },
     calendar: { title: 'Календарь', fields: [field('currentDate', 'Сюжетная дата', 'date')], lists: [{ key: 'plans', title: 'Планы', fields: [field('title', 'Название'), field('date', 'Дата', 'date'), field('time', 'Время', 'time'), field('details', 'Подробности', 'textarea')] }, { key: 'birthdays', title: 'Дни рождения', fields: [field('person', 'Имя'), field('monthDay', 'Месяц-день, например 03-08'), field('note', 'Заметка', 'textarea')] }] },
-    secrets: { title: 'Секреты', lists: [{ key: 'entries', title: 'Секреты персонажей', fields: [field('title', 'Название'), field('summary', 'Содержание и кто знает', 'textarea'), field('owner', 'Чей секрет', 'select', [['char', 'Персонажа'], ['user', 'Персоны']]), field('revealed', 'Статус', 'select', [['false', 'Не раскрыт'], ['true', 'Раскрыт']])] }] },
+    secrets: { title: 'Секреты', lists: [{ key: 'entries', title: 'Секреты', fields: [field('title', 'Название'), field('summary', 'Содержание и кто знает', 'textarea'), field('owner', 'Чей секрет', 'select', [['char', 'Персонажа'], ['user', 'Персоны'], ['world', 'Мира']]), field('revealed', 'Статус', 'select', [['false', 'Не раскрыт'], ['true', 'Раскрыт']])] }] },
     gallery: { title: 'Галерея', lists: ['memories', 'items'].map(key => ({ key, title: key === 'items' ? 'Предметы' : 'Воспоминания', fields: [field('title', 'Название'), field('summary', 'Факт для памяти', 'textarea'), field('detail', 'Личное воспоминание', 'textarea'), field('imagePrompt', 'Визуальный промпт', 'textarea'), field('aspectRatio', 'Пропорции'), field('imageUrl', 'Путь или URL изображения')] })) },
     pending: { title: 'Заметки текущей арки', lists: [{ key: 'eventNotes', title: 'Конспекты интервалов', fixed: true, fields: [field('summary', 'Конспект', 'textarea'), field('arcReason', 'Причина завершения', 'textarea')] }] },
     arcs: { title: 'Арки', lists: [{ key: 'entries', title: 'Сводки арок', fixed: true, fields: [field('title', 'Название'), field('summary', 'Конспект', 'textarea')] }] },
@@ -28,7 +29,7 @@ function set(object, path, value) {
     parent[keys.at(-1)] = value;
 }
 
-export function createSectionEditor({ getState, isBusy, onSaved }) {
+export function createSectionEditor({ getSettings, getState, isBusy, onSaved }) {
     let dialog;
     let session;
     const close = () => { dialog?.close(); dialog?.remove(); dialog = null; session = null; };
@@ -68,7 +69,7 @@ export function createSectionEditor({ getState, isBusy, onSaved }) {
     function render() {
         const { section, draft, owner, context } = session;
         const definition = SECTIONS[section];
-        const ownerSelector = section === 'secrets' ? `<label class="mnema-edit-field">Чьи секреты<select class="text_pole" id="mnema_edit_owner"><option value="user" ${owner === 'user' ? 'selected' : ''}>${escapeHtml(context.name1 || 'Персона')}</option><option value="char" ${owner === 'char' ? 'selected' : ''}>${escapeHtml(context.name2 || 'Персонаж')}</option></select></label>` : '';
+        const ownerSelector = section === 'secrets' ? `<label class="mnema-edit-field">Чьи секреты<select class="text_pole" id="mnema_edit_owner"><option value="user" ${owner === 'user' ? 'selected' : ''}>${escapeHtml(context.name1 || 'Персона')}</option><option value="char" ${owner === 'char' ? 'selected' : ''}>${escapeHtml(context.name2 || 'Персонаж')}</option><option value="world" ${owner === 'world' ? 'selected' : ''}>Мир</option></select></label>` : '';
         dialog.innerHTML = `<form method="dialog"><header><h3>Редактировать: ${definition.title}</h3><button type="button" data-edit-close aria-label="Закрыть">×</button></header><p>Изменения сохранятся после нажатия «Сохранить».</p><label class="mnema-edit-field">Раздел<select class="text_pole" id="mnema_edit_section">${Object.entries(SECTIONS).map(([key, value]) => `<option value="${key}" ${key === section ? 'selected' : ''}>${value.title}</option>`).join('')}</select></label>${ownerSelector}<div class="mnema-edit-fields">${(definition.fields || []).map(def => inputHtml(def, get(draft, def.key))).join('')}</div>${(definition.lists || []).map(renderList).join('')}<footer><button class="menu_button" type="button" data-edit-close>Отмена</button><button class="menu_button" type="submit">Сохранить</button></footer></form>`;
     }
     function collect() {
@@ -89,7 +90,7 @@ export function createSectionEditor({ getState, isBusy, onSaved }) {
         session.original = JSON.stringify(state[section]);
         session.draft = structuredClone(section === 'arcs' ? { entries: state.arcs } : section === 'secrets' ? { entries: [...state.secrets.unrevealed.map(item => ({ ...item, revealed: false })), ...state.secrets.revealed.map(item => ({ ...item, revealed: true }))] } : state[section]);
         session.dirty = false;
-        session.owner = target.owner === 'char' ? 'char' : 'user';
+        session.owner = SECRET_OWNERS.includes(target.owner) ? target.owner : 'user';
         session.expanded = new Set();
         if (section === 'arcs' && target.id) {
             const index = session.draft.entries.findIndex(item => item.id === target.id);
@@ -108,6 +109,18 @@ export function createSectionEditor({ getState, isBusy, onSaved }) {
         const draft = session.draft;
         let value = draft;
         if (section === 'secrets') value = { revealed: draft.entries.filter(item => item.revealed).map(({ revealed, ...item }) => item), unrevealed: draft.entries.filter(item => !item.revealed).map(({ revealed, ...item }) => item) };
+        if (section === 'secrets') {
+            for (const owner of SECRET_OWNERS) {
+                if (secretCount({ secrets: value }, owner) > Math.max(secretLimit(getSettings(), owner), secretCount(state, owner))) return notify('Достигнут лимит секретов в этой категории', 'info');
+            }
+            const entries = [...value.revealed, ...value.unrevealed];
+            const oldEntries = [...state.secrets.revealed, ...state.secrets.unrevealed];
+            for (let i = 0; i < entries.length; i++) {
+                if (oldEntries.some(old => JSON.stringify(old) === JSON.stringify(entries[i]))) continue;
+                if (entries[i].title.length > 60 || entries[i].summary.length > 180) return notify('Сократите секрет: название до 60, содержание до 180 символов', 'info');
+                if (entries.some((other, j) => i !== j && sameSecret(entries[i], other))) return notify('Такой секрет уже есть', 'info');
+            }
+        }
         if (section === 'arcs') value = draft.entries;
         if (section === 'world' || section === 'relationship') value.updatedAt = new Date().toISOString();
         // Правка руками — самый свежий источник времени: помечаем её концом

@@ -1,6 +1,7 @@
+import { infoblockTheme, themedInfoblockHeader } from './infoblock-themes.js';
 import { getContext } from '/scripts/extensions.js';
 import { escapeHtml } from './utils.js';
-import { applySecretsUpdate, normalizeClock } from './state.js';
+import { applySecretsUpdate, normalizeClock, timeOfDayFromClock } from './state.js';
 import { galleryEnabled } from './gallery-data.js';
 import { dateFromIso, formatCalendarDate } from './calendar.js';
 import { nearestStoryPlan, rungTitle } from './prompts.js';
@@ -27,7 +28,7 @@ export function infoblockInstruction(settings = {}) {
         '- clock is in-story time, never real-world time. Field values must not contain |, [ or ].',
         '- description belongs in the same tag as a location change: the new place exactly as you narrated it. Include char_outfit or user_outfit when clothing is first established or changes, with accessories and condition.',
         settings.trackCalendar ? '- plan only for a new or changed commitment made in this scene; omit an unknown date.' : '- Calendar is off: omit date and plan.',
-        ...(settings.trackSecrets ? ['- revealed only when an existing secret actually became known to the other side in this reply. Copy its title exactly, never its contents; suspicion and hints are not disclosure. Repeat the field for several disclosures.'] : []),
+        ...(settings.trackSecrets ? ['- revealed only when an existing secret actually became known to both protagonists in this reply, including world secrets. Copy its title exactly, never its contents; suspicion and hints are not disclosure. Repeat the field for several disclosures.'] : []),
         '- Field values in the language of the story, labels in English. Write only the story: never explain, repeat or mention the tag.',
         'Example when only time changed: [MN: clock: 21:40]',
     ].join('\n');
@@ -166,6 +167,8 @@ export function applySceneToState(state, scene, settings, messageIndex) {
         }
         state.world.clockIndex = messageIndex;
     }
+    const timeOfDay = timeOfDayFromClock(state.world.clock);
+    if (state.world.timeOfDay !== timeOfDay) { state.world.timeOfDay = timeOfDay; changed = true; }
     if (scene.location && scene.location.toLowerCase() !== String(state.world.location).toLowerCase()) {
         state.world.location = scene.location;
         state.world.description = '';
@@ -221,14 +224,15 @@ function secretsSection(state, peek) {
     const context = getContext();
     const mine = own('user');
     const theirs = own('char');
-    const line = secret => `<li class="mnema-ib-secret"><i class="fa-solid ${secret.revealed ? 'fa-lock-open' : 'fa-lock'}" aria-hidden="true"></i><div><b>${escapeHtml(secret.title)}</b><small>${secret.revealed ? 'Раскрыт' : 'Личная тайна'}</small>${secret.summary ? `<p>${escapeHtml(secret.summary)}</p>` : ''}</div></li>`;
-    const veiled = theirs.filter(secret => !secret.revealed).length;
-    const column = (secrets, name, icon, hidden) => {
+    const line = secret => `<li class="mnema-ib-secret"><i class="fa-solid ${secret.revealed ? 'fa-lock-open' : 'fa-lock'}" aria-hidden="true"></i><div><b>${escapeHtml(secret.title)}</b><small>${secret.revealed ? 'Раскрыт' : secret.owner === 'world' ? 'Тайна мира' : 'Личная тайна'}</small>${secret.summary ? `<p>${escapeHtml(secret.summary)}</p>` : ''}</div></li>`;
+    const column = (secrets, name, icon, owner) => {
+        const hidden = owner !== 'user';
+        const veiled = secrets.filter(secret => !secret.revealed).length;
         const revealed = secrets.filter(secret => secret.revealed).length;
         const percent = secrets.length ? Math.round(revealed / secrets.length * 100) : 0;
         const visible = secrets.filter(secret => !hidden || secret.revealed || peek);
-        return `<section class="mnema-ib-secret-column"><h6><span><i class="fa-solid ${icon}" aria-hidden="true"></i> ${escapeHtml(name)}</span><span class="mnema-ib-secret-tools"><button type="button" class="mnema-ib-action mnema-ib-icon" data-mnema-focus="secrets" data-focus-owner="${hidden ? 'char' : 'user'}" title="Придумать секреты" aria-label="Придумать секреты: ${escapeHtml(name)}"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></button><button type="button" class="mnema-ib-action mnema-ib-icon" data-mnema-ib="add-secret" title="Добавить секрет" aria-label="Добавить секрет: ${escapeHtml(name)}" aria-expanded="false"><i class="fa-solid fa-plus" aria-hidden="true"></i></button></span></h6>
-            <form class="mnema-ib-secret-form" data-owner="${hidden ? 'char' : 'user'}" hidden><textarea name="secret" rows="3" maxlength="600" required aria-label="Новый секрет" placeholder="Новый секрет…"></textarea><div><button type="submit" class="mnema-ib-action">Добавить</button><button type="button" class="mnema-ib-action" data-mnema-ib="cancel-secret">Отмена</button></div></form>
+        return `<section class="mnema-ib-secret-column"><h6><span><i class="fa-solid ${icon}" aria-hidden="true"></i> ${escapeHtml(name)}</span><span class="mnema-ib-secret-tools"><button type="button" class="mnema-ib-action mnema-ib-icon" data-mnema-focus="secrets" data-focus-owner="${owner}" title="Придумать секреты" aria-label="Придумать секреты: ${escapeHtml(name)}"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></button><button type="button" class="mnema-ib-action mnema-ib-icon" data-mnema-ib="add-secret" title="Добавить секрет" aria-label="Добавить секрет: ${escapeHtml(name)}" aria-expanded="false"><i class="fa-solid fa-plus" aria-hidden="true"></i></button></span></h6>
+            <form class="mnema-ib-secret-form" data-owner="${owner}" hidden><textarea name="secret" rows="3" maxlength="180" required aria-label="Новый секрет" placeholder="Новый секрет…"></textarea><div><button type="submit" class="mnema-ib-action">Добавить</button><button type="button" class="mnema-ib-action" data-mnema-ib="cancel-secret">Отмена</button></div></form>
             ${secrets.length ? meter(`Раскрыто ${revealed} из ${secrets.length}`, percent) : '<p class="mnema-ib-note">Секретов пока нет</p>'}
             ${visible.length ? `<ul class="mnema-ib-list">${visible.map(line).join('')}</ul>` : ''}
             ${hidden && veiled ? `<button type="button" class="mnema-ib-action" data-mnema-ib="${peek ? 'unpeek' : 'peek'}"><i class="fa-solid ${peek ? 'fa-eye-slash' : 'fa-eye'}" aria-hidden="true"></i> ${peek ? 'Скрыть нераскрытые' : `Показать нераскрытые (${veiled})`}</button>` : ''}
@@ -237,7 +241,7 @@ function secretsSection(state, peek) {
 
     return `<section class="mnema-ib-section mnema-ib-secrets-section"><details class="mnema-ib-secrets" data-mnema-details="secrets">
         <summary><span class="mnema-ib-secret-heading"><i class="fa-solid fa-key" aria-hidden="true"></i><span>Секреты<small>Что известно друг о друге</small></span></span><i class="fa-solid fa-chevron-down mnema-ib-chevron" aria-hidden="true"></i></summary>
-        <div class="mnema-ib-secret-columns">${column(mine, context?.name1 || 'Вы', 'fa-user', false)}${column(theirs, context?.name2 || 'Персонаж', 'fa-mask', true)}</div>
+        <div class="mnema-ib-secret-columns">${column(mine, context?.name1 || 'Вы', 'fa-user', 'user')}${column(theirs, context?.name2 || 'Персонаж', 'fa-mask', 'char')}${column(own('world'), 'Секреты мира', 'fa-earth-americas', 'world')}</div>
     </details></section>`;
 }
 
@@ -300,12 +304,13 @@ export function buildInfoblock({ scene, state, settings, live, busy, peek = fals
         scene = { ...(live ? state?.world : {}), date: live && settings.trackCalendar ? state?.calendar?.currentDate : null };
     }
     const date = dateFromIso(scene.date);
-    const head = `<div class="mnema-ib-head">
+    const theme = infoblockTheme(settings.infoblockTheme);
+    const head = themedInfoblockHeader(theme, { ...scene, location: scene.location || state?.world?.location }, date ? formatCalendarDate(date, true) : '') || `<div class="mnema-ib-head">
         <div class="mnema-ib-place"><i class="fa-solid fa-location-dot"></i><div><strong>${escapeHtml(scene.location || state?.world?.location || 'Место не указано')}</strong><small>${escapeHtml([scene.indoor === true ? 'внутри' : scene.indoor === false ? 'снаружи' : '', scene.weather, Number.isFinite(scene.temperature) ? `${scene.temperature}°` : ''].filter(Boolean).join(' · '))}</small></div></div>
         <div class="mnema-ib-time"><strong>${escapeHtml(scene.clock || '··:··')}</strong><small>${escapeHtml(date ? formatCalendarDate(date, true) : '')}</small></div>${live && state ? '<i class="fa-solid fa-chevron-down mnema-ib-chevron" aria-hidden="true"></i>' : ''}
     </div>`;
-    if (!live || !state) return `<div class="mnema-ib">${head}</div>`;
-    return `<div class="mnema-ib mnema-ib-live${busy ? ' busy' : ''}">
+    if (!live || !state) return `<div class="mnema-ib" data-ib-theme="${theme}">${head}</div>`;
+    return `<div class="mnema-ib mnema-ib-live${busy ? ' busy' : ''}" data-ib-theme="${theme}">
         <details class="mnema-ib-details" data-mnema-details="scene"><summary title="Раскрыть или свернуть состояние сцены">${head}</summary>
             <div class="mnema-ib-actions" role="group" aria-label="Действия Mnema">${busy ? '<span class="mnema-ib-working" role="status">Создаётся…</span>' : ''}${actions(settings, busy)}</div>
             <div class="mnema-ib-body">${statusRows(state, settings, peek)}</div>

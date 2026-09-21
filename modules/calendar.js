@@ -116,6 +116,7 @@ function detectStoryDate(chat, previousDate = null) {
 export function syncCalendarDate(chat, state) {
     const detected = detectStoryDate(chat, state.calendar.currentDate);
     if (!detected) return false;
+    if (Number.isInteger(state.calendar.sourceMessageIndex) && detected.messageIndex < state.calendar.sourceMessageIndex) return false;
     const nextDate = isoDate(detected.date);
     if (nextDate === state.calendar.currentDate && detected.messageIndex === state.calendar.sourceMessageIndex) return false;
     state.calendar.currentDate = nextDate;
@@ -124,9 +125,17 @@ export function syncCalendarDate(chat, state) {
     return true;
 }
 
-export function applyCalendarUpdates(state, updates, enabled = true) {
+export function applyCalendarUpdates(state, updates, enabled = true, messageIndex = null, { tieWins = true } = {}) {
     if (!enabled || !updates || typeof updates !== 'object') return;
-    const anchor = dateFromIso(state.calendar.currentDate) || new Date();
+    const currentDate = dateFromIso(updates.current_date ?? updates.currentDate);
+    const recorded = state.calendar.sourceMessageIndex;
+    const fresher = !state.calendar.currentDate || (Number.isInteger(messageIndex) && (!Number.isInteger(recorded) || (tieWins ? messageIndex >= recorded : messageIndex > recorded)));
+    if (currentDate && fresher) {
+        state.calendar.currentDate = isoDate(currentDate);
+        state.calendar.sourceMessageIndex = messageIndex;
+        state.calendar.viewOffsetWeeks = 0;
+    }
+    const anchor = dateFromIso(state.calendar.currentDate);
     for (const item of Array.isArray(updates.birthdays) ? updates.birthdays : []) {
         const person = String(item?.person || item?.name || '').trim();
         const previous = state.calendar.birthdays.find(entry => String(entry.person || '').toLowerCase() === person.toLowerCase());

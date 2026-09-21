@@ -16,11 +16,11 @@ export const DEFAULT_SETTINGS = Object.freeze({
     apiUrl: '',
     apiKey: '',
     model: '',
-    temperature: 0.25,
     trackRelationships: true,
     trackCalendar: true,
     trackHealth: true,
     trackSecrets: true,
+    secretLimits: Object.freeze({ user: 10, char: 10, world: 10 }),
     collectGallery: true,
     galleryMemoriesEnabled: true,
     galleryMemoryMode: 'auto',
@@ -28,6 +28,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
     galleryKeepsakeMode: 'auto',
     galleryContext: 12,
     infoblock: false,
+    infoblockTheme: 'classic',
 });
 
 export const RELATIONSHIP_METRICS = Object.freeze([
@@ -37,11 +38,7 @@ export const RELATIONSHIP_METRICS = Object.freeze([
     ['attachment', 'Привязанность', 'fa-link'],
 ]);
 
-// Лестница отношений у каждой истории своя: общий список ступеней не подходит ни
-// одному конкретному сюжету, поэтому её складывает разбор и хранит состояние
-// чата. Свободная «стадия» описывает сегодняшний оттенок, ступень отвечает на
-// один вопрос — где именно история сейчас, — а между двумя ступенями в любой
-// момент может появиться третья, если сюжет её показал.
+// Concrete status labels and brief entry conditions; no prescribed romantic destination.
 export const RELATIONSHIP_LADDER_LIMIT = 14;
-export const RELATIONSHIP_RUNG_TITLE_LIMIT = 60;
-export const RELATIONSHIP_RUNG_NOTE_LIMIT = 220;
+export const RELATIONSHIP_RUNG_TITLE_LIMIT = 40;
+export const RELATIONSHIP_RUNG_NOTE_LIMIT = 100;

@@ -1,3 +1,4 @@
+import { sameSecret, secretSlots, secretKey } from './secrets.js';
 import { getContext } from '/scripts/extensions.js';
 import { getCurrentChatId } from '/script.js';
 import { RELATIONSHIP_LADDER_LIMIT, RELATIONSHIP_METRICS, RELATIONSHIP_RUNG_NOTE_LIMIT, RELATIONSHIP_RUNG_TITLE_LIMIT, STATE_KEY } from './config.js';
@@ -58,7 +59,7 @@ export function normalizeState(state, chat) {
     // Номер сообщения, из которого взято время. Уехал за пределы чата после
     // удаления или ветвления — забываем: иначе он навсегда заблокирует часы.
     state.world.clockIndex = Number.isInteger(state.world.clockIndex) && state.world.clockIndex < chat.length ? state.world.clockIndex : null;
-    state.world.timeOfDay = String(state.world.timeOfDay || '').trim().slice(0, 40);
+    state.world.timeOfDay = timeOfDayFromClock(state.world.clock);
     state.world.weather = String(state.world.weather || '').trim().slice(0, 60);
     state.world.temperature = state.world.temperature !== null && state.world.temperature !== '' && Number.isFinite(Number(state.world.temperature)) ? Math.round(Number(state.world.temperature)) : null;
     return state;
@@ -139,6 +140,7 @@ function applySnapshot(state, snapshot, chat) {
     state.processedThrough = Math.min(Number(snapshot.processedThrough ?? -1), chat.length - 1);
     state.pending = structuredClone(snapshot.pending);
     state.world = structuredClone(snapshot.world);
+    state.world.timeOfDay = timeOfDayFromClock(state.world.clock);
     state.health = structuredClone(snapshot.health);
     state.relationship = structuredClone(snapshot.relationship);
     state.calendar = { ...state.calendar, ...structuredClone(snapshot.calendar) };
@@ -190,6 +192,16 @@ export function normalizeClock(value) {
     const minutes = Number(match[2]);
     if (hours > 23 || minutes > 59) return '';
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+export function timeOfDayFromClock(value) {
+    const clock = normalizeClock(value);
+    if (!clock) return '';
+    const hour = Number(clock.slice(0, 2));
+    if (hour < 6) return 'ночь';
+    if (hour < 12) return 'утро';
+    if (hour < 18) return 'день';
+    return 'вечер';
 }
 
 function normalizeVital(vital) {
@@ -257,9 +269,9 @@ export function normalizeRelationship(value) {
     const relationship = {
         ladder,
         phase: phaseIndex >= 0 ? ladder[phaseIndex].id : '',
-        nextStep: String(source.nextStep || source.next_step || '').trim().slice(0, 400),
-        stage: String(source.stage || source.status || 'Не определено').slice(0, 80),
-        behavior: String(source.behavior || '').trim().slice(0, 1200),
+        nextStep: String(source.nextStep ?? source.next_step ?? '').trim().slice(0, 120),
+        stage: String(ladder[phaseIndex]?.title || source.stage || source.status || 'Не определено').slice(0, 40),
+        behavior: String(source.behavior || '').trim().slice(0, 100),
         progress: clampPercent(source.progress),
         trust: clampPercent(source.trust),
         passion: clampPercent(source.passion),
@@ -292,16 +304,12 @@ function normalizeGalleryEntries(entries, kind) {
     }).filter(Boolean).slice(0, 50);
 }
 
-// Пройденное — уже история, и переписывать её новым разбором нельзя: ступени по
-// самую верхнюю, где история побывала, остаются как есть, у них обновляется
-// только пояснение. Граница именно по побывавшей, а не по текущей: после ссоры
-// отношения падают вниз, но прожитое от этого не исчезает. Всё, что выше, модель
-// вправе перерисовать целиком — в том числе вставить между двумя ступенями
-// третью, если сюжет показал промежуточную.
+// Пройденные этапы сохраняют порядок и id. Анализ может уточнить название
+// по существующему id, не меняя факты и прогресс отношений.
 function mergeLadder(previous, phase, incoming) {
     if (!Array.isArray(incoming) || !incoming.length) return null;
     const lastReached = previous.map(rung => rung.reached).lastIndexOf(true);
-    const history = previous.slice(0, Math.max(lastReached, findRung(previous, phase)) + 1);
+    const history = previous.slice(0, Math.max(lastReached, findRung(previous, phase)) + 1).map(rung => ({ ...rung }));
     const known = new Map(history.map(rung => [rungKey(rung.title), rung]));
     const ahead = [];
     for (const item of incoming) {
@@ -309,9 +317,19 @@ function mergeLadder(previous, phase, incoming) {
         const title = String(source.title || source.label || source.name || '').trim();
         const note = String(source.note || source.hint || source.description || '').trim();
         if (!title) continue;
-        const rung = known.get(rungKey(title));
-        if (rung) { if (note) rung.note = note; continue; }
-        const fresh = { id: '', title, note };
+        const rung = history.find(item => source.id && item.id === source.id) || known.get(rungKey(title));
+        if (rung) {
+            const collision = known.get(rungKey(title));
+            if (!collision || collision === rung) {
+                known.delete(rungKey(rung.title));
+                rung.title = title;
+                known.set(rungKey(title), rung);
+            }
+            if (typeof source.note === 'string') rung.note = note;
+            continue;
+        }
+        const prior = previous.find(item => source.id && item.id === source.id);
+        const fresh = { id: prior?.id || '', title, note };
         known.set(rungKey(title), fresh);
         ahead.push(fresh);
     }
@@ -352,12 +370,13 @@ export function applyRelationshipUpdate(state, update, settings) {
     const phase = requested ? advance(ladder, previous.phase, requested) : null;
     if (phase && phase !== previous.phase) patch.phase = phase;
     const nextStep = typeof update.next_step === 'string' ? update.next_step : update.nextStep;
-    if (typeof nextStep === 'string' && nextStep.trim()) patch.nextStep = nextStep.trim();
+    if (requested && phase && findRung(ladder, requested) !== findRung(ladder, phase)) patch.nextStep = ladder[findRung(ladder, phase) + 1]?.note || '';
+    else if (typeof nextStep === 'string') patch.nextStep = nextStep.trim();
     // Следующий шаг всегда относится к текущей фазе: сменилась фаза — старый шаг
     // уже пройден, и лучше пустое поле, чем описание вчерашнего порога.
     else if (patch.phase) patch.nextStep = '';
     if (typeof update.stage === 'string' && update.stage.trim()) patch.stage = update.stage.trim();
-    if (typeof update.behavior === 'string' && update.behavior.trim()) patch.behavior = update.behavior.trim();
+    if (typeof update.behavior === 'string') patch.behavior = update.behavior.trim();
     else if ((patch.stage && patch.stage !== previous.stage) || patch.phase) patch.behavior = '';
     for (const key of ['progress', ...RELATIONSHIP_METRICS.map(([metric]) => metric)]) {
         if (typeof update[key] === 'number' && Number.isFinite(update[key])) patch[key] = update[key];
@@ -394,6 +413,7 @@ export function applyGalleryUpdates(state, updates, settings, sourceMessages = [
 // owner решает только одно: показывать секрет игроку сразу или прятать под
 // кнопку. Свои секреты игрок и так знает, чужие — спойлер.
 function normalizeSecretOwner(value) {
+    if (/^(world|мир)$/iu.test(String(value || '').trim())) return 'world';
     return /^(?:user|player|persona|\{\{user\}\}|юзер|игрок|пользовател)/iu.test(String(value || '').trim()) ? 'user' : 'char';
 }
 
@@ -410,7 +430,7 @@ function normalizeSecretEntry(entry) {
 
 export function applySecretsUpdate(state, update, settings) {
     if (!settings.trackSecrets || !update || typeof update !== 'object') return;
-    const findByTitle = (list, title) => list.findIndex(item => String(item.title || '').toLowerCase() === title.toLowerCase());
+    const findByTitle = (list, title) => list.findIndex(item => secretKey(item.title) === secretKey(title));
     for (const raw of Array.isArray(update.reveal) ? update.reveal : []) {
         const title = String(typeof raw === 'string' ? raw : raw?.title || '').trim();
         if (!title) continue;
@@ -421,19 +441,21 @@ export function applySecretsUpdate(state, update, settings) {
     }
     for (const raw of Array.isArray(update.new_unrevealed) ? update.new_unrevealed : []) {
         const secret = normalizeSecretEntry(raw);
+        if (secret) { secret.summary = secret.summary.slice(0, 180); }
         if (!secret) continue;
-        const existing = [...state.secrets.unrevealed, ...state.secrets.revealed].find(item => item.title.toLowerCase() === secret.title.toLowerCase());
-        if (existing) { if (secret.summary) existing.summary = secret.summary; existing.owner = secret.owner; }
-        else state.secrets.unrevealed.push(secret);
+        const existing = [...state.secrets.unrevealed, ...state.secrets.revealed].find(item => sameSecret(item, secret));
+        if (existing) { if (secret.summary) existing.summary = secret.summary; /* Keep the existing owner and disclosure state. */ }
+        else if (secretSlots(state, settings, secret.owner)) state.secrets.unrevealed.push({ ...secret, title: secret.title.slice(0, 60) });
     }
     for (const raw of Array.isArray(update.new_revealed) ? update.new_revealed : []) {
         const secret = normalizeSecretEntry(raw);
+        if (secret) { secret.summary = secret.summary.slice(0, 180); }
         if (!secret) continue;
-        const hiddenIndex = findByTitle(state.secrets.unrevealed, secret.title);
+        const hiddenIndex = state.secrets.unrevealed.findIndex(item => sameSecret(item, secret));
         const previous = hiddenIndex >= 0 ? state.secrets.unrevealed.splice(hiddenIndex, 1)[0] : null;
-        const existing = state.secrets.revealed.find(item => item.title.toLowerCase() === secret.title.toLowerCase());
-        if (existing) { if (secret.summary) existing.summary = secret.summary; existing.owner = secret.owner; }
-        else state.secrets.revealed.push({ ...secret, summary: secret.summary || previous?.summary || '', owner: previous?.owner || secret.owner });
+        const existing = state.secrets.revealed.find(item => sameSecret(item, secret));
+        if (existing) { if (secret.summary) existing.summary = secret.summary; /* Keep the existing owner and disclosure state. */ }
+        else if (previous || secretSlots(state, settings, secret.owner)) state.secrets.revealed.push({ ...secret, title: previous?.title || secret.title.slice(0, 60), summary: secret.summary || previous?.summary || '', owner: previous?.owner || secret.owner });
     }
 }
 
@@ -474,8 +496,7 @@ export function applyWorldUpdate(state, update, messageIndex = null, { tieWins =
         state.world.clock = clock;
         state.world.clockIndex = messageIndex ?? state.world.clockIndex;
     }
-    const timeOfDay = String(update.time_of_day || update.timeOfDay || '').trim().slice(0, 40);
-    if (timeOfDay) state.world.timeOfDay = timeOfDay;
+    state.world.timeOfDay = timeOfDayFromClock(state.world.clock);
     const weather = String(update.weather || '').trim().slice(0, 60);
     if (weather) state.world.weather = weather;
     if (update.temperature !== null && update.temperature !== undefined && Number.isFinite(Number(update.temperature))) {

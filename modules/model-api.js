@@ -58,7 +58,6 @@ export async function requestModel(messages, settings, maxTokens = 1000) {
             prompt,
             maxTokens,
             { stream: false, extractData: true, includePreset: false, includeInstruct: false },
-            { temperature: settings.temperature },
         );
         const text = extractText(result);
         if (!String(text).trim()) throw new Error('Профиль вернул пустой ответ');
@@ -72,7 +71,7 @@ export async function requestModel(messages, settings, maxTokens = 1000) {
         response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...authHeaders(settings) },
-            body: JSON.stringify({ model: settings.model.trim(), messages, temperature: settings.temperature, max_tokens: maxTokens, stream: false }),
+            body: JSON.stringify({ model: settings.model.trim(), messages, max_tokens: maxTokens, stream: false }),
         });
     } catch (error) {
         if (error instanceof TypeError) throw new Error('Не удалось обратиться к Extra API. Проверьте адрес и настройки CORS');

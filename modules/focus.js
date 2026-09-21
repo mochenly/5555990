@@ -1,3 +1,4 @@
+import { secretSlots } from './secrets.js';
 import { getContext } from '/scripts/extensions.js';
 import { getCurrentChatId } from '/script.js';
 import { parseJsonResponse, requestModel } from './model-api.js';
@@ -46,13 +47,14 @@ export function createFocusController({ getState, getSettings, onChanged, isProc
         const chatId = getCurrentChatId();
         const state = getState();
         if (!state || !context.chat?.length) return notify('Откройте чат', 'error');
+        if (secrets && !secretSlots(state, settings, owner)) return notify('Достигнут лимит секретов в этой категории', 'info');
         const current = () => getCurrentChatId() === chatId && getContext()?.chat === context.chat && getState({ create: false }) === state;
 
         busy = { kind, owner };
         onChanged();
         try {
             const messages = buildFocusPrompt({
-                kind, owner, state,
+                kind, owner, state, settings,
                 participants: participantContext(context),
                 messages: gallerySceneMessages(context.chat, CONTEXT_MESSAGES),
                 characterName: context.name2,

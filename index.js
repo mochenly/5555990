@@ -1,3 +1,5 @@
+import { infoblockTheme } from './modules/infoblock-themes.js';
+import { SECRET_OWNERS, secretLimit, secretSlots, sameSecret } from './modules/secrets.js';
 import { extension_settings, getContext } from '/scripts/extensions.js';
 import {
     eventSource,
@@ -79,6 +81,7 @@ const focus = createFocusController({
     },
 });
 const sectionEditor = createSectionEditor({
+    getSettings: () => settings,
     getState,
     isBusy: () => processing || Boolean(gallery.status().busy) || Boolean(focus.status().busy),
     onSaved: () => {
@@ -94,6 +97,8 @@ function loadSettings() {
         ...(extension_settings[EXTENSION_KEY] || {}),
     };
     settings = extension_settings[EXTENSION_KEY];
+    delete settings.temperature;
+    settings.infoblockTheme = infoblockTheme(settings.infoblockTheme);
     initializeGallerySettings(settings);
     saveSettingsDebounced();
 }
@@ -102,7 +107,7 @@ function saveSettings() {
     settings.interval = Math.max(1, Math.min(100, Number(settings.interval) || DEFAULT_SETTINGS.interval));
     settings.arcMaxMessages = Math.max(0, Math.min(500, Math.round(Number(settings.arcMaxMessages) || 0)));
     settings.arcMaxTokens = Math.max(0, Math.min(200000, Math.round(Number(settings.arcMaxTokens) || 0)));
-    settings.temperature = Math.max(0, Math.min(2, Number(settings.temperature) || 0));
+    settings.secretLimits = Object.fromEntries(SECRET_OWNERS.map(owner => [owner, secretLimit(settings, owner)]));
     saveSettingsDebounced();
     updateArcInjection();
 }
@@ -210,13 +215,14 @@ function syncSettingsUi() {
     $('#mnema_api_url').val(settings.apiUrl);
     $('#mnema_api_key').val(settings.apiKey);
     $('#mnema_model').val(settings.model);
-    $('#mnema_temperature').val(settings.temperature);
     $('#mnema_track_relationships').prop('checked', settings.trackRelationships);
     $('#mnema_track_calendar').prop('checked', settings.trackCalendar);
     $('#mnema_track_health').prop('checked', settings.trackHealth);
+    for (const owner of SECRET_OWNERS) $(`#mnema_secret_limit_${owner}`).val(secretLimit(settings, owner));
     $('#mnema_track_secrets').prop('checked', settings.trackSecrets);
     $('#mnema_collect_gallery').prop('checked', settings.collectGallery);
     $('#mnema_infoblock').prop('checked', settings.infoblock);
+    $(`[name="mnema_infoblock_theme"][value="${infoblockTheme(settings.infoblockTheme)}"]`).prop('checked', true);
     gallerySettings.sync();
     refreshProfileOptions();
     const manual = settings.connectionMode === 'manual';
@@ -419,7 +425,7 @@ function applyAnalysisState(chat, state, result, indices = null) {
     // При включённом инфоблоке время ведёт метка основной модели: она идёт по
     // каждому сообщению, а анализ только оценивает его по пачке задним числом.
     applyWorldUpdate(state, result.world_update || result.world, clockIndex, { tieWins: !settings.infoblock });
-    applyCalendarUpdates(state, result.calendar_updates || result.calendar, settings.trackCalendar);
+    applyCalendarUpdates(state, result.calendar_updates || result.calendar, settings.trackCalendar, clockIndex, { tieWins: !settings.infoblock });
     applyHealthUpdate(state, result.health_update || result.health, settings);
     applyRelationshipUpdate(state, result.relationship_update || result.relationship, settings);
     applySecretsUpdate(state, result.secrets_update || result.secrets, settings);
@@ -967,7 +973,6 @@ function bindEvents() {
     $(document).on('change', '#mnema_api_key', function () { settings.apiKey = this.value.trim(); saveSettings(); syncManualModels(); });
     $(document).on('click', '#mnema_model_refresh', () => void refreshManualModels());
     $(document).on('change', '#mnema_model', function () { settings.model = this.value.trim(); saveSettings(); });
-    $(document).on('change', '#mnema_temperature', function () { settings.temperature = this.value; saveSettings(); syncSettingsUi(); });
     $(document).on('click', '.mnema-section-disclosure', function () {
         const expanded = $(this).toggleClass('expanded').hasClass('expanded');
         this.setAttribute('aria-expanded', String(expanded));
@@ -976,15 +981,21 @@ function bindEvents() {
     $(document).on('change', '#mnema_track_relationships', function () { settings.trackRelationships = this.checked; saveSettings(); updateSectionVisibility(); });
     $(document).on('change', '#mnema_track_calendar', function () { settings.trackCalendar = this.checked; saveSettings(); updateSectionVisibility(); });
     $(document).on('change', '#mnema_track_health', function () { settings.trackHealth = this.checked; saveSettings(); updateSectionVisibility(); });
+    $(document).on('change', '[data-secret-limit]', function () { settings.secretLimits = { ...settings.secretLimits, [this.dataset.secretLimit]: this.value }; saveSettings(); syncSettingsUi(); });
     $(document).on('change', '#mnema_track_secrets', function () { settings.trackSecrets = this.checked; saveSettings(); updateSectionVisibility(); });
     $(document).on('change', '#mnema_collect_gallery', function () { settings.collectGallery = this.checked; saveSettings(); updateSectionVisibility(); });
+    $(document).on('change', '[name="mnema_infoblock_theme"]', function () {
+        settings.infoblockTheme = infoblockTheme(this.value);
+        saveSettings();
+        if (settings.infoblock) decorateInfoblocks();
+    });
     $(document).on('change', '#mnema_infoblock', function () {
         settings.infoblock = this.checked;
         saveSettings();
         if (this.checked) decorateInfoblocks(); else removeInfoblocks();
     });
     $(document).on('click', '[data-mnema-focus]', function () {
-        void focus.generate(this.dataset.mnemaFocus, this.dataset.focusOwner === 'user' ? 'user' : 'char');
+        void focus.generate(this.dataset.mnemaFocus, SECRET_OWNERS.includes(this.dataset.focusOwner) ? this.dataset.focusOwner : 'char');
     });
     $(document).on('click', '.mnema-ib-action', async function () {
         const action = this.dataset.mnemaIb;
@@ -1014,9 +1025,11 @@ function bindEvents() {
         const state = getState({ create: false });
         const text = this.elements.secret.value.trim();
         if (!state || !settings.trackSecrets || !text) return;
-        const title = text.slice(0, 120);
-        if ([...state.secrets.revealed, ...state.secrets.unrevealed].some(secret => secret.title.toLowerCase() === title.toLowerCase())) return notify('Секрет с таким названием уже есть', 'info');
-        const secret = { title, summary: text.length > 120 ? text : '', owner: this.dataset.owner === 'user' ? 'user' : 'char' };
+        const owner = SECRET_OWNERS.includes(this.dataset.owner) ? this.dataset.owner : 'char';
+        if (!secretSlots(state, settings, owner)) return notify('Достигнут лимит секретов в этой категории', 'info');
+        const title = text.slice(0, 60);
+        if ([...state.secrets.revealed, ...state.secrets.unrevealed].some(secret => sameSecret(secret, { title, summary: text }))) return notify('Секрет с таким названием уже есть', 'info');
+        const secret = { title, summary: text.length > 60 ? text.slice(0, 180) : '', owner };
         this.dataset.saving = 'true';
         state.secrets.unrevealed.push(secret);
         try {

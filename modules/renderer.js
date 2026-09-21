@@ -148,6 +148,9 @@ export function createRenderer({ getState, getSettings, isProcessing, candidateI
     function renderSecrets(state) {
         const people = getParticipantVisuals();
         const userSecrets = collectSecrets(state, 'user');
+        const worldSecrets = collectSecrets(state, 'world');
+        $('#mnema_world_secrets_count').text(worldSecrets.length);
+        $('#mnema_world_secrets').html(renderSecretItems(worldSecrets, { spoil: peeking, peekable: true, emptyText: 'Тайн мира пока нет.' }));
         const charSecrets = collectSecrets(state, 'char');
         const revealedCount = charSecrets.filter(secret => secret.revealed).length;
 

@@ -1,4 +1,5 @@
 import { MENU_BUTTON_ID, POPUP_ID } from './config.js';
+import { infoblockThemesHtml } from './infoblock-themes.js';
 import { gallerySettingsHtml } from './gallery-settings.js';
 
 export function menuHtml() {
@@ -141,6 +142,17 @@ export function popupHtml() {
                                     <div class="mnema-secret-progress"><i id="mnema_char_secrets_fill"></i></div>
                                     <div id="mnema_char_secrets" class="mnema-secret-list"></div>
                                 </section>
+                                <section class="mnema-secret-group unrevealed">
+                                    <header class="mnema-secret-group-head">
+                                        <span class="mnema-secret-icon"><i class="fa-solid fa-earth-americas"></i></span>
+                                        <div><h4 id="mnema_world_secrets_title">Секреты мира</h4><small>Скрытые истины за пределами двух героев</small></div>
+                                        <span id="mnema_world_secrets_count" class="mnema-secret-count">0</span>
+                                        <button type="button" class="mnema-section-edit" data-mnema-focus="secrets" data-focus-owner="world" title="Придумать секреты мира" aria-label="Придумать секреты мира"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+                                        <button type="button" class="mnema-section-edit" data-mnema-edit="secrets" data-edit-owner="world" title="Редактировать секреты мира" aria-label="Редактировать секреты мира"><i class="fa-solid fa-pen"></i></button>
+                                    </header>
+
+                                    <div id="mnema_world_secrets" class="mnema-secret-list"></div>
+                                </section>
                             </div>
                         </section>
                         <section class="mnema-tab-panel" data-mnema-panel="relationships">
@@ -266,6 +278,16 @@ export function popupHtml() {
                                     <label class="mnema-check mnema-glass-card"><input id="mnema_collect_gallery" type="checkbox"> <span><strong>Галерея</strong><small>Собирать важные воспоминания и памятные предметы</small></span></label>
                                 </div>
                             </div>
+                            <div class="mnema-settings-section mnema-glass-card">
+                                <h4>Лимиты секретов</h4>
+                                <p>Максимум на категорию, включая раскрытые. 0 запрещает новые записи. Уже сохранённые секреты не удаляются.</p>
+                                <div class="mnema-field-row">
+                                    <label class="mnema-field">Персона<input id="mnema_secret_limit_user" data-secret-limit="user" class="text_pole" type="number" min="0" max="100" step="1"></label>
+                                    <label class="mnema-field">Персонаж<input id="mnema_secret_limit_char" data-secret-limit="char" class="text_pole" type="number" min="0" max="100" step="1"></label>
+                                    <label class="mnema-field">Мир<input id="mnema_secret_limit_world" data-secret-limit="world" class="text_pole" type="number" min="0" max="100" step="1"></label>
+                                </div>
+                            </div>
+                            ${infoblockThemesHtml()}
                             ${gallerySettingsHtml()}
                             <div class="mnema-settings-section mnema-glass-card">
                                 <h4>Подключение</h4>
@@ -282,7 +304,6 @@ export function popupHtml() {
                                         <datalist id="mnema_model_options"></datalist>
                                     </label>
                                 </div>
-                                <label class="mnema-field">Temperature<input id="mnema_temperature" class="text_pole" type="number" min="0" max="2" step="0.05"></label>
                                 <button id="mnema_test_connection" class="menu_button" type="button"><i class="fa-solid fa-plug"></i> Проверить подключение</button>
                             </div>
                         </section>

@@ -1683,3 +1683,131 @@ html[data-mnema-lang="en"] .mes.mnema-arc-message .ch_name .name_text::after { c
 @media (prefers-reduced-motion: reduce) {
     .mnema-ib-chevron, .mnema-ib-meter .mnema-ib-track i, .mnema-ib-action.mnema-ib-icon { transition: none; }
 }
+
+/* Infoblock appearances: miniature headers and compact expandable content. */
+.mnema-ib[data-ib-theme] { --ib-accent: #b5a27e; box-sizing: border-box; width: min(100%, 320px); max-width: 100%; margin: 10px auto; font-size: 12px; line-height: 1.45; isolation: isolate; }
+.mnema-ib[data-ib-theme] *, .mnema-ib-theme-picker * { box-sizing: border-box; }
+.mnema-ib[data-ib-theme] .mnema-ib-head { padding: 9px 11px; gap: 9px; }
+.mnema-ib[data-ib-theme] .mnema-ib-place strong { white-space: normal; overflow-wrap: anywhere; font-size: 12px; font-weight: 500; }
+.mnema-ib[data-ib-theme] .mnema-ib-time strong { font-size: 17px; }
+.mnema-ib[data-ib-theme] .mnema-ib-body { display: flex; flex-direction: column; gap: 7px; padding: 8px; }
+.mnema-ib[data-ib-theme] .mnema-ib-section { padding: 9px; border-radius: 9px; }
+.mnema-ib[data-ib-theme] .mnema-ib-section h6 { margin-bottom: 7px; font-size: 10px; letter-spacing: .02em; }
+.mnema-ib[data-ib-theme] .mnema-ib-meters { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.mnema-ib[data-ib-theme] .mnema-ib-meter.trust { --meter-color: #8baf89; }
+.mnema-ib[data-ib-theme] .mnema-ib-meter.attachment { --meter-color: #c7a173; }
+.mnema-ib[data-ib-theme] .mnema-ib-actions { padding: 3px 8px; gap: 3px; }
+.mnema-ib[data-ib-theme] .mnema-ib-action.mnema-ib-icon { width: 28px; height: 28px; min-width: 28px; font-size: 11px; }
+.mnema-ib[data-ib-theme] .mnema-ib-clock-face { font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1; letter-spacing: -.04em; }
+.mnema-ib[data-ib-theme] .mnema-ib-relationship-heading { flex-wrap: wrap; gap: 6px; }
+.mnema-ib[data-ib-theme] .mnema-ib-relationship-heading > .mnema-ib-tag { max-width: 100%; white-space: normal; }
+.mnema-ib[data-ib-theme] .mnema-ib-secret-columns { grid-template-columns: minmax(0, 1fr); gap: 7px; padding: 8px; }
+.mnema-ib[data-ib-theme] .mnema-ib-section.mnema-ib-secrets-section { padding: 0; }
+.mnema-ib[data-ib-theme] .mnema-ib-secrets > summary { padding: 9px; gap: 8px; }
+.mnema-ib[data-ib-theme] .mnema-ib-secret-heading { gap: 7px; }
+.mnema-ib[data-ib-theme] .mnema-ib-secret-heading > i { width: 24px; height: 24px; border-radius: 7px; }
+.mnema-ib[data-ib-theme] .mnema-ib-date-tile { flex-basis: 35px; min-height: 40px; border-radius: 6px; }
+.mnema-ib[data-ib-theme] .mnema-ib-date-tile b { font-size: 19px; }
+.mnema-ib[data-ib-theme] .mnema-ib-reminder { gap: 9px; }
+.mnema-ib[data-ib-theme] .mnema-ib-note { margin-top: 6px; }
+.mnema-ib[data-ib-theme] .mnema-ib-body .mnema-ib-list li { padding: 4px 0; }
+
+/* Clock: aligned clock/date columns above a small location capsule. */
+.mnema-ib[data-ib-theme="glass"] { --ib-accent: #a7bda5; --SmartThemeBorderColor: color-mix(in srgb, currentColor 16%, transparent); width: min(100%, 280px); border: 0; border-radius: 0; background: transparent; box-shadow: none; overflow: visible; }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-glass-head { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: 8px 10px; padding: 5px 0 0; }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-clock-face { font-size: 32px; font-weight: 300; align-self: center; padding-left: 7px; }
+.mnema-ib-glass-meta { min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 3px; border-left: 1px solid var(--SmartThemeBorderColor); padding: 1px 7px 1px 10px; font-size: 10px; line-height: 1.35; overflow-wrap: anywhere; }
+.mnema-ib-glass-meta > span { font-variant-numeric: tabular-nums; }
+.mnema-ib-glass-meta small { color: inherit; font-size: 10px; opacity: .7; }
+.mnema-ib-glass-place { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 10px; border: 1px solid var(--SmartThemeBorderColor); border-radius: 12px; background: color-mix(in srgb, currentColor 4%, transparent); }
+.mnema-ib-glass-place strong { font-size: 11px; font-weight: 450; text-align: center; overflow-wrap: anywhere; }
+.mnema-ib-glass-place > i { opacity: .6; font-size: 10px; }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-details > summary:hover { background: transparent; }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-body { padding: 6px 0 0; gap: 7px; }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-section { border-radius: 12px; background: color-mix(in srgb, currentColor 3%, transparent); }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-section > h6 { text-align: center; }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-body .mnema-ib-list > li { align-items: center; text-align: center; }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-actions { justify-content: center; border: 0; padding: 5px 0 0; }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-secrets .mnema-ib-list > li { text-align: left; align-items: flex-start; }
+
+/* Frost: a single translucent lens with a soft blur and light-catching edges. */
+.mnema-ib[data-ib-theme="frost"] { --ib-accent: #b9c3a6; --SmartThemeBorderColor: color-mix(in srgb, currentColor 17%, transparent); background: linear-gradient(125deg, #ffffff20, #ffffff03 45%, #d8d7bd12), color-mix(in srgb, var(--SmartThemeBlurTintColor, #24251f) 18%, transparent); border: 1px solid #ffffff30; border-bottom-color: #ffffff14; border-radius: 15px; backdrop-filter: blur(20px) saturate(135%); -webkit-backdrop-filter: blur(20px) saturate(135%); box-shadow: inset 0 1px 0 #ffffff38, inset 1px 0 0 #ffffff0c, 0 5px 16px #00000014; overflow: hidden; }
+.mnema-ib[data-ib-theme="frost"] .mnema-ib-frost-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 12px; padding: 10px 12px; }
+.mnema-ib-frost-place { min-width: 0; display: flex; align-items: center; gap: 6px; }
+.mnema-ib-frost-place strong { font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
+.mnema-ib-frost-place > i { font-size: 10px; opacity: .6; }
+.mnema-ib[data-ib-theme="frost"] .mnema-ib-clock-face { grid-column: 2; grid-row: 1 / 3; font-size: 26px; font-weight: 300; }
+.mnema-ib-frost-meta { min-width: 0; display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: 10px; opacity: .7; }
+.mnema-ib-frost-meta small { color: inherit; font-size: inherit; }
+.mnema-ib[data-ib-theme="frost"] .mnema-ib-section { border-color: #ffffff14; background: #ffffff05; border-radius: 10px; }
+.mnema-ib[data-ib-theme="frost"] .mnema-ib-actions { background: #ffffff04; border-color: #ffffff14; }
+.mnema-ib[data-ib-theme="frost"] .mnema-ib-secret-column { background: #ffffff04; }
+
+/* Journal: a pocket notebook with a small serif title and ruled sections. */
+.mnema-ib[data-ib-theme="journal"] { --ib-accent: #926039; --SmartThemeTextColor: #3e382c; --SmartThemeBorderColor: #d0c1a5; width: min(100%, 300px); color: #3e382c; background: #f1e8d6; background-image: repeating-linear-gradient(0deg, #8c714404 0px, #8c714404 1px, transparent 1px, transparent 4px); border: 1px solid #d0c1a5; border-radius: 2px 2px 9px 2px; box-shadow: 2px 2px 0 #c4b59933; text-shadow: none; font-family: Georgia, 'Times New Roman', serif; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-journal-head { display: block; padding: 8px 11px; }
+.mnema-ib-journal-dateline { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; padding-bottom: 4px; border-bottom: 1px solid #c9b99b; font: 10px/1.3 system-ui, sans-serif; }
+.mnema-ib-journal-place { padding: 5px 0 4px; font-size: 18px; line-height: 1.15; font-weight: 500; overflow-wrap: anywhere; }
+.mnema-ib-journal-footer { border-top: 1px solid #d8cbb3; padding-top: 3px; }
+.mnema-ib-journal-footer > small { font: 10px/1.3 system-ui, sans-serif; }
+.mnema-ib[data-ib-theme="journal"] :is(small, button, i) { color: inherit; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-body { padding: 0 11px 10px; gap: 9px; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-section { border: 0; border-top: 1px solid #c9b99b; border-radius: 0; background: transparent; padding: 8px 0 0; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-section h6 { color: #785638; font: 600 10px/1.4 system-ui, sans-serif; opacity: 1; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-actions { border-bottom: 0; margin: 0 11px; padding: 3px 0; justify-content: flex-start; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-meter.trust { --meter-color: #59744b; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-meter.passion { --meter-color: #a75549; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-meter.devotion { --meter-color: #96702f; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-meter.attachment { --meter-color: #83643d; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-meter .mnema-ib-track { border-radius: 0; height: 3px; background: #daceb7; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-note, .mnema-ib[data-ib-theme="journal"] .mnema-ib-list li span { opacity: .85; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-secret-column { background: #e8dcc566; border-radius: 2px; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-tag, .mnema-ib[data-ib-theme="journal"] .mnema-ib-date-tile { border-radius: 2px; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-secret-form textarea { background: #fff8e9; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-warning { color: #9d3e32; }
+
+/* Terminal: a narrow amber readout with compact dashboard rows. */
+.mnema-ib[data-ib-theme="terminal"] { --ib-accent: #e7b263; --SmartThemeTextColor: #e2dccd; --SmartThemeBorderColor: #45443a; color: #e2dccd; background: #232521; border: 1px solid #45443a; border-top: 2px solid #c79752; border-radius: 3px; box-shadow: 0 4px 12px #0002; text-shadow: none; font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-terminal-head { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; padding: 9px 10px; gap: 10px; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-clock-face { color: #efbd70; font-size: 24px; letter-spacing: -.06em; padding-right: 10px; border-right: 1px solid #45443a; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-clock-face small { display: block; margin-top: 5px; color: #b3b2a5; font: 9px/1.3 system-ui, sans-serif; letter-spacing: 0; }
+.mnema-ib-terminal-place { min-width: 0; overflow-wrap: anywhere; }
+.mnema-ib-terminal-place strong { display: block; font-size: 11px; font-weight: 500; line-height: 1.35; }
+.mnema-ib-terminal-place small { display: block; margin-top: 3px; color: #b3b2a5; font-size: 10px; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-body { gap: 1px; padding: 1px; background: #45443a; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-section { background: #232521; border: 0; border-radius: 0; padding: 9px; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-section h6 { color: #efbd70; opacity: .9; font-size: 10px; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-actions { justify-content: flex-start; border-bottom: 0; background: #1c1e1b; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-track { border-radius: 0; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-track i { border-radius: 0; background-image: repeating-linear-gradient(90deg, transparent 0px, transparent 5px, #232521 5px, #232521 7px); }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-secret-column { border-radius: 2px; background: #1c1e1b; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-date-tile, .mnema-ib[data-ib-theme="terminal"] .mnema-ib-tag, .mnema-ib[data-ib-theme="terminal"] .mnema-ib-action { border-radius: 2px; }
+/* Theme picker: native radios remain keyboard-accessible. */
+.mnema-ib-theme-picker { min-width: 0; margin: 18px 0; padding: 16px; border: 1px solid var(--mnema-border-soft, #8884); border-radius: 14px; }
+.mnema-ib-theme-picker legend { padding: 0 8px; font-size: 13px; }
+.mnema-ib-theme-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.mnema-ib-theme-option { position: relative; cursor: pointer; min-width: 0; }
+.mnema-ib-theme-option input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.mnema-ib-theme-card { display: flex; height: 100%; flex-direction: column; gap: 5px; padding: 10px; border: 1px solid #8884; border-radius: 10px; background: #88888808; transition: border-color 150ms, background 150ms; }
+.mnema-ib-theme-card > strong { font-size: 12px; font-weight: 600; }
+.mnema-ib-theme-card > small { font-size: 10px; line-height: 1.5; opacity: .7; }
+.mnema-ib-theme-option input:checked + .mnema-ib-theme-card { border-color: #b99764; background: #b9976414; box-shadow: inset 0 0 0 1px #b99764; }
+.mnema-ib-theme-option input:focus-visible + .mnema-ib-theme-card { outline: 2px solid currentColor; outline-offset: 3px; }
+.mnema-ib-theme-sample { height: 54px; padding: 8px; display: grid; gap: 5px; align-content: center; border-radius: 6px; background: #353632; color: #e1ddcf; }
+.mnema-ib-theme-sample b { font: 500 16px/1.2 system-ui, sans-serif; }
+.mnema-ib-theme-sample i { height: 3px; width: 65%; background: currentColor; opacity: .25; border-radius: 2px; }
+.mnema-ib-theme-sample[data-theme="classic"] { grid-template-columns: 1fr 1fr; }
+.mnema-ib-theme-sample[data-theme="classic"] b { grid-column: 2; grid-row: 1 / 4; text-align: right; }
+.mnema-ib-theme-sample[data-theme="glass"] { background: linear-gradient(125deg, #87918044, #d4d3bc11); border: 1px solid #c5cdb54d; color: inherit; justify-items: center; }
+.mnema-ib-theme-sample[data-theme="glass"] b { font-size: 22px; font-weight: 300; }
+.mnema-ib-theme-sample[data-theme="glass"] i { width: 42%; }
+.mnema-ib-theme-sample[data-theme="glass"] i:last-child { display: none; }
+.mnema-ib-theme-sample[data-theme="journal"] { background: #f1e8d6; color: #735338; border-radius: 1px; grid-template-columns: 1fr 1fr; }
+.mnema-ib-theme-sample[data-theme="journal"] b { grid-column: 1 / -1; font-family: Georgia, serif; border-bottom: 1px solid #a7916b; padding-bottom: 5px; }
+.mnema-ib-theme-sample[data-theme="terminal"] { background: #232521; color: #efbd70; border-top: 2px solid #c79752; border-radius: 1px; grid-template-columns: 1fr 1fr; }
+.mnema-ib-theme-sample[data-theme="terminal"] b { grid-row: 1 / 4; font-family: ui-monospace, monospace; }
+.mnema-ib-theme-sample[data-theme="frost"] { grid-template-columns: 1fr 1fr; background: linear-gradient(120deg, #d9dfcc33, #ffffff08); color: inherit; border: 1px solid #ffffff38; border-radius: 10px; box-shadow: inset 0 1px 0 #ffffff40; }
+.mnema-ib-theme-sample[data-theme="frost"] b { grid-column: 2; grid-row: 1 / 4; text-align: right; font-size: 22px; font-weight: 300; }
+@media (prefers-reduced-motion: reduce) {
+    .mnema-ib[data-ib-theme] *, .mnema-ib-theme-card { transition: none !important; animation: none !important; }
+}
