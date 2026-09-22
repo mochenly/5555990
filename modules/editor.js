@@ -1,5 +1,6 @@
 import { SECRET_OWNERS, secretLimit, secretCount, sameSecret } from './secrets.js';
 import { getContext } from '/scripts/extensions.js';
+import { arcMessageText } from './arc-summary.js';
 import { normalizeState } from './state.js';
 import { escapeHtml, notify } from './utils.js';
 
@@ -11,10 +12,10 @@ const SECTIONS = {
         // Список ступеней редактируется как обычный список записей, а текущая
         // ступень — выбор из него же, поэтому варианты собираются из черновика.
         fields: [field('phase', 'Текущая ступень', 'select', draft => [['', 'Не определена'], ...(draft.ladder || []).map(rung => [rung.id, rung.title])]), field('nextStep', 'Следующий шаг в отношениях', 'textarea'), field('stage', 'Стадия отношений'), field('behavior', 'Как отношение влияет на поведение', 'textarea'), ...['progress', 'trust', 'passion', 'devotion', 'attachment'].map((key, i) => field(key, ['Прогресс', 'Доверие', 'Страсть', 'Преданность', 'Привязанность'][i] + ', 0–100', 'percent'))],
-        lists: [{ key: 'ladder', title: 'Ступени этой истории', fields: [field('title', 'Название ступени'), field('note', 'Что она означает', 'textarea')] }],
+        lists: [{ key: 'ladder', title: 'Ступени этой истории', fields: [field('title', 'Название ступени'), field('note', 'Что должно произойти', 'textarea')] }],
     },
     health: { title: 'Здоровье', fields: [field('satiety.value', 'Сытость, 0–100', 'percent'), field('satiety.label', 'Описание сытости'), field('energy.value', 'Энергия, 0–100', 'percent'), field('energy.label', 'Описание энергии'), field('mood.label', 'Настроение'), field('mood.tone', 'Тон настроения', 'select', [['', 'Не указан'], ['positive', 'Положительный'], ['neutral', 'Нейтральный'], ['negative', 'Отрицательный']])], lists: [{ key: 'injuries', title: 'Травмы и состояния', fields: [field('name', 'Название'), field('severity', 'Тяжесть', 'select', [['minor', 'Лёгкая'], ['moderate', 'Средняя'], ['severe', 'Тяжёлая']]), field('details', 'Симптомы, ограничения, лечение', 'textarea')] }] },
-    calendar: { title: 'Календарь', fields: [field('currentDate', 'Сюжетная дата', 'date')], lists: [{ key: 'plans', title: 'Планы', fields: [field('title', 'Название'), field('date', 'Дата', 'date'), field('time', 'Время', 'time'), field('details', 'Подробности', 'textarea')] }, { key: 'birthdays', title: 'Дни рождения', fields: [field('person', 'Имя'), field('monthDay', 'Месяц-день, например 03-08'), field('note', 'Заметка', 'textarea')] }] },
+    calendar: { title: 'Календарь', fields: [field('currentDate', 'Сюжетная дата', 'date')], lists: [{ key: 'plans', title: 'Планы', fields: [field('title', 'Название'), field('kind', 'Род записи', 'select', [['personal', 'Личный план героев'], ['world', 'Событие мира']]), field('date', 'Дата', 'date'), field('time', 'Время', 'time'), field('details', 'Подробности', 'textarea')] }, { key: 'birthdays', title: 'Дни рождения', fields: [field('person', 'Имя'), field('monthDay', 'Месяц-день, например 03-08'), field('note', 'Заметка', 'textarea')] }] },
     secrets: { title: 'Секреты', lists: [{ key: 'entries', title: 'Секреты', fields: [field('title', 'Название'), field('summary', 'Содержание и кто знает', 'textarea'), field('owner', 'Чей секрет', 'select', [['char', 'Персонажа'], ['user', 'Персоны'], ['world', 'Мира']]), field('revealed', 'Статус', 'select', [['false', 'Не раскрыт'], ['true', 'Раскрыт']])] }] },
     gallery: { title: 'Галерея', lists: ['memories', 'items'].map(key => ({ key, title: key === 'items' ? 'Предметы' : 'Воспоминания', fields: [field('title', 'Название'), field('summary', 'Факт для памяти', 'textarea'), field('detail', 'Личное воспоминание', 'textarea'), field('imagePrompt', 'Визуальный промпт', 'textarea'), field('aspectRatio', 'Пропорции'), field('imageUrl', 'Путь или URL изображения')] })) },
     pending: { title: 'Заметки текущей арки', lists: [{ key: 'eventNotes', title: 'Конспекты интервалов', fixed: true, fields: [field('summary', 'Конспект', 'textarea'), field('arcReason', 'Причина завершения', 'textarea')] }] },
@@ -146,7 +147,9 @@ export function createSectionEditor({ getSettings, getState, isBusy, onSaved }) 
             const index = context.chat.findIndex(message => message.extra?.mnema_arc_id === arc.id);
             if (index < 0) continue;
             changedMessages.push({ index, text: context.chat[index].mes });
-            context.chat[index].mes = `### Конспект арки: ${arc.title}\n\n${arc.summary}`;
+            // Общий сборщик, а не своя строка: иначе правка заголовка тихо
+            // стирала бы перечень, про который редактор ничего не знает.
+            context.chat[index].mes = arcMessageText(arc);
         }
         dialog.querySelectorAll('button').forEach(button => { button.disabled = true; });
         try {

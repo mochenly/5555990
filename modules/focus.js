@@ -24,12 +24,13 @@ function applySecrets(state, result, settings, owner) {
     return state.secrets.unrevealed.length - before;
 }
 
-function applyPlans(state, result, settings) {
+function applyPlans(state, result, settings, kind) {
     const list = Array.isArray(result?.plans) ? result.plans : Array.isArray(result) ? result : [];
     const before = state.calendar.plans.length;
     // Статусы вырезаем: эта кнопка только предлагает новое и не имеет права
-    // удалить план, который чат уже согласовал.
-    applyCalendarUpdates(state, { plans: list.map(item => ({ ...item, status: undefined })) }, settings.trackCalendar);
+    // удалить план, который чат уже согласовал. Род берём из кнопки, а не из
+    // ответа: нажавший уже сказал, что именно просит придумать.
+    applyCalendarUpdates(state, { plans: list.map(item => ({ ...item, status: undefined, kind })) }, settings.trackCalendar);
     return state.calendar.plans.length - before;
 }
 
@@ -68,17 +69,19 @@ export function createFocusController({ getState, getSettings, onChanged, isProc
             const restore = () => { if (secrets) state.secrets = rollback; else state.calendar.plans = rollback; };
             let added = 0;
             try {
-                added = secrets ? applySecrets(state, result, settings, owner) : applyPlans(state, result, settings);
+                added = secrets ? applySecrets(state, result, settings, owner) : applyPlans(state, result, settings, kind === 'events' ? 'world' : 'personal');
                 // Ответ мог оказаться пересказом уже записанного: правки в
                 // существующие записи тогда уже внесены, а сохранять их незачем.
-                if (!added) throw new Error(secrets ? 'Модель не предложила ни одного нового секрета' : 'Модель не предложила ни одного нового плана');
+                if (!added) throw new Error(secrets ? 'Модель не предложила ни одного нового секрета'
+                    : kind === 'events' ? 'Модель не предложила ни одного нового события'
+                    : 'Модель не предложила ни одного нового плана');
                 await context.saveChat();
             } catch (error) {
                 restore();
                 throw error;
             }
             onChanged();
-            notify(t(secrets ? 'Добавлено секретов: {n}' : 'Добавлено планов: {n}', { n: added }), 'success');
+            notify(t(secrets ? 'Добавлено секретов: {n}' : kind === 'events' ? 'Добавлено событий: {n}' : 'Добавлено планов: {n}', { n: added }), 'success');
         } catch (error) {
             if (current()) notify(error.message || String(error), 'error');
         } finally {

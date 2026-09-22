@@ -358,6 +358,21 @@ body.mnema-popup-open { overflow: hidden; }
 .mnema-note em { display: block; margin-top: 8px; color: var(--mnema-muted); font-size: 11px; font-style: normal; }
 .mnema-arc h5 { margin: 4px 0 0; font-size: 14px; }
 .mnema-arc p { margin-bottom: 10px; }
+/* Collapsed by default: a long story accumulates arcs, and a wall of expanded
+   summaries makes the tab unscrollable. */
+.mnema-arc > summary { cursor: pointer; list-style: none; }
+.mnema-arc > summary::-webkit-details-marker { display: none; }
+.mnema-arc > summary::marker { content: ''; }
+.mnema-arc-preview { margin: 6px 0 0; color: var(--mnema-muted); font-size: 12px; line-height: 1.45; }
+.mnema-arc[open] > summary .mnema-arc-preview { display: none; }
+.mnema-arc-chevron { flex: 0 0 auto; margin-left: 2px; font-size: 11px; opacity: .5; transition: transform 200ms ease; }
+.mnema-arc[open] > summary .mnema-arc-chevron { transform: rotate(180deg); }
+.mnema-arc-body { padding-top: 10px; }
+/* Recap: the scannable half of an arc, deliberately set apart from the prose. */
+.mnema-arc-recap { display: grid; gap: 10px; margin: 0 0 10px; padding: 10px 12px; border-left: 2px solid var(--mnema-accent, #b99764); border-radius: 0 8px 8px 0; background: #ffffff05; }
+.mnema-arc-recap h6 { margin: 0 0 4px; font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; opacity: .6; }
+.mnema-arc-recap ul { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 3px; }
+.mnema-arc-recap li { font-size: 12px; line-height: 1.45; opacity: .85; }
 .mnema-arc.inactive { opacity: 0.52; }
 .mnema-arc-toggle { width: 30px; flex: 0 0 30px; padding: 0; }
 
@@ -997,6 +1012,9 @@ body.mnema-popup-open { overflow: hidden; }
 
 .mnema-calendar-list-block { min-width: 0; }
 
+/* One line saying what the list is for — the difference between a promise and a
+   holiday is not obvious from the entries themselves. */
+.mnema-calendar-hint { margin: 4px 0 8px; color: var(--mnema-muted); font-size: 11px; line-height: 1.45; }
 .mnema-calendar-list-title {
     display: flex;
     align-items: center;
@@ -1562,7 +1580,11 @@ html[data-mnema-lang="en"] .mes.mnema-arc-message .ch_name .name_text::after { c
 .mnema-ib-action.mnema-ib-icon:disabled { opacity: 0.3; cursor: wait; pointer-events: none; }
 .mnema-ib-head { display: flex; align-items: center; gap: 10px; padding: 8px 10px; }
 .mnema-ib-place { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
-.mnema-ib-place i { opacity: 0.6; }
+/* Thin SVG icons. Sized in em so every existing font-size rule keeps
+   controlling them, and painted with currentColor so they inherit the
+   colour and opacity of wherever they sit. */
+.mnema-ib-ico { width: 1.08em; height: 1.08em; flex: 0 0 auto; vertical-align: -0.17em; }
+.mnema-ib-place :is(i, svg) { opacity: 0.6; }
 .mnema-ib-place strong, .mnema-ib-time strong { display: block; line-height: 1.2; }
 .mnema-ib-place small, .mnema-ib-time small { display: block; opacity: 0.6; font-size: 0.85em; }
 .mnema-ib-place div { min-width: 0; }
@@ -1570,19 +1592,16 @@ html[data-mnema-lang="en"] .mes.mnema-arc-message .ch_name .name_text::after { c
 .mnema-ib-time { text-align: right; flex-shrink: 0; }
 .mnema-ib-time strong { font-variant-numeric: tabular-nums; font-size: 1.15em; }
 .mnema-ib-details summary { padding: 6px 10px; border-top: 1px solid var(--SmartThemeBorderColor, #fff2); cursor: pointer; opacity: 0.75; font-size: 0.92em; }
-.mnema-ib-details summary i { margin-right: 6px; }
+.mnema-ib-details summary :is(i, svg) { margin-right: 6px; }
 .mnema-ib-body { display: flex; flex-direction: column; gap: 10px; padding: 10px; }
 .mnema-ib-section h6 { margin: 0 0 6px; font-size: 0.9em; opacity: 0.7; font-weight: 600; }
-.mnema-ib-section h6 i { margin-right: 5px; }
+.mnema-ib-section h6 :is(i, svg) { margin-right: 5px; }
 .mnema-ib-vital { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .mnema-ib-vital span { flex: 0 0 72px; opacity: 0.7; }
 .mnema-ib-vital b { flex: 0 0 38px; text-align: right; font-variant-numeric: tabular-nums; }
 .mnema-ib-track { flex: 1; height: 5px; border-radius: 3px; background: #fff2; overflow: hidden; }
 .mnema-ib-track i { display: block; height: 100%; border-radius: 3px; background: var(--SmartThemeQuoteColor, #a78bfa); }
-.mnema-ib-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .mnema-ib-tag { padding: 2px 7px; border: 1px solid var(--SmartThemeBorderColor, #fff2); border-radius: 999px; font-size: 0.85em; opacity: 0.85; }
-.mnema-ib-tag.moderate { border-color: #e0a23388; }
-.mnema-ib-tag.severe { border-color: #e0555588; }
 .mnema-ib-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }
 .mnema-ib-list li { display: flex; gap: 8px; align-items: baseline; }
 .mnema-ib-list li b { font-weight: 500; }
@@ -1591,7 +1610,7 @@ html[data-mnema-lang="en"] .mes.mnema-arc-message .ch_name .name_text::after { c
 .mnema-ib-action { padding: 5px 10px; border: 1px solid var(--SmartThemeBorderColor, #fff2); border-radius: 7px; background: transparent; color: inherit; font-size: 0.9em; cursor: pointer; }
 .mnema-ib-action:hover { background: #fff1; }
 .mnema-ib-missing { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-style: dashed; }
-.mnema-ib-missing > i { opacity: 0.6; }
+.mnema-ib-missing > :is(i, svg) { opacity: 0.6; }
 .mnema-ib-missing div { flex: 1; }
 .mnema-ib-missing small { display: block; opacity: 0.6; }
 
@@ -1603,7 +1622,7 @@ html[data-mnema-lang="en"] .mes.mnema-arc-message .ch_name .name_text::after { c
 .mnema-secret-peek { display: block; width: 100%; margin-top: 6px; padding: 6px 10px; border: 1px dashed var(--SmartThemeBorderColor, #fff3); border-radius: 8px; background: transparent; color: inherit; font-size: 0.9em; cursor: pointer; opacity: 0.8; }
 .mnema-secret-peek:hover { opacity: 1; background: #fff1; }
 .mnema-ib-secrets summary { cursor: pointer; opacity: 0.8; font-size: 0.9em; font-weight: 600; }
-.mnema-ib-secrets summary i { margin-right: 5px; }
+.mnema-ib-secrets summary :is(i, svg) { margin-right: 5px; }
 .mnema-ib-secret-count { margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #fff2; font-variant-numeric: tabular-nums; font-weight: 400; }
 .mnema-ib-secrets h6 { margin: 8px 0 4px; font-size: 0.88em; opacity: 0.65; }
 .mnema-ib-secrets .mnema-ib-action { margin-top: 6px; }
@@ -1613,7 +1632,7 @@ html[data-mnema-lang="en"] .mes.mnema-arc-message .ch_name .name_text::after { c
 .mnema-ib-details > summary { padding: 0; border: 0; opacity: 1; font-size: inherit; list-style: none; }
 .mnema-ib-details > summary::-webkit-details-marker { display: none; }
 .mnema-ib-details > summary::marker { content: ''; }
-.mnema-ib-details > summary i { margin: 0; }
+.mnema-ib-details > summary :is(i, svg) { margin: 0; }
 .mnema-ib-head { padding: 12px 14px; gap: 12px; }
 .mnema-ib-details > summary:hover { background: #ffffff06; }
 .mnema-ib-details > summary:focus-visible, .mnema-ib-action:focus-visible, .mnema-ib-secrets > summary:focus-visible { outline: 2px solid var(--ib-accent); outline-offset: -3px; border-radius: 10px; }
@@ -1636,15 +1655,30 @@ html[data-mnema-lang="en"] .mes.mnema-arc-message .ch_name .name_text::after { c
 .mnema-ib-meter .mnema-ib-track { height: 6px; border-radius: 99px; background: #ffffff0c; }
 .mnema-ib-meter .mnema-ib-track i { border-radius: inherit; background: var(--meter-color); transition: width 250ms ease; }
 .mnema-ib-vital-card > small { display: block; margin-top: 6px; opacity: 0.65; font-size: 0.8em; }
-.mnema-ib-vital-card > .mnema-ib-warning { color: #e798a0; opacity: 1; }
-.mnema-ib-mood { margin: 0 0 12px; font-size: 0.95em; }
-.mnema-ib-tags { margin-top: 10px; }
+/* Filled alert beside the label instead of a spelled-out line under the bar. */
+.mnema-ib-alarm { display: inline-flex; margin-left: 5px; color: #e26d7a; font-size: 0.95em; opacity: 1; vertical-align: -0.16em; }
+/* Injuries: severity and details in the open, not a colour-coded pill row. */
+.mnema-ib-injuries { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.mnema-ib-injuries > li { --injury: #9aa0a6; display: flex; align-items: flex-start; gap: 9px; padding: 7px 9px; border-left: 2px solid var(--injury); border-radius: 0 7px 7px 0; background: color-mix(in srgb, var(--injury) 9%, transparent); }
+.mnema-ib-injuries > li[data-severity="moderate"] { --injury: #d6aa66; }
+.mnema-ib-injuries > li[data-severity="severe"] { --injury: #e26d7a; }
+.mnema-ib-injuries > li > :is(i, svg) { margin-top: 2px; color: var(--injury); font-size: 0.9em; }
+.mnema-ib-injuries > li > div { min-width: 0; }
+.mnema-ib-injuries b { display: block; font-weight: 500; overflow-wrap: anywhere; }
+.mnema-ib-injuries small { display: block; margin-top: 2px; font-size: 0.82em; opacity: 0.6; overflow-wrap: anywhere; }
+/* Mood is a label, not a sentence of the section: a tinted chip carrying the
+   tone the model already records but the plate never showed. */
+.mnema-ib-mood { --mood: #9aa0a6; display: inline-flex; align-items: center; gap: 7px; max-width: 100%; margin: 0 0 12px; padding: 5px 11px 5px 9px; border: 1px solid color-mix(in srgb, var(--mood) 35%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--mood) 12%, transparent); font-size: 0.9em; line-height: 1.35; }
+.mnema-ib-mood[data-tone="positive"] { --mood: #8fbf8a; }
+.mnema-ib-mood[data-tone="negative"] { --mood: #d98a92; }
+.mnema-ib-mood > :is(i, svg) { flex: 0 0 auto; color: var(--mood); font-size: 1.05em; }
+.mnema-ib-mood > span { min-width: 0; overflow-wrap: anywhere; }
 .mnema-ib-relationship-details > summary { padding: 0; border: 0; opacity: 1; font-size: inherit; list-style: none; cursor: pointer; }
 .mnema-ib-relationship-details > summary::-webkit-details-marker { display: none; }
 .mnema-ib-relationship-details > summary::marker { content: ''; }
 .mnema-ib-relationship-details > summary:focus-visible { outline: 2px solid var(--ib-accent); outline-offset: 4px; border-radius: 4px; }
 .mnema-ib-relationship-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
-.mnema-ib-relationship-heading > i:first-child { color: #d995ab; margin: 0; }
+.mnema-ib-relationship-heading > :is(i, svg):first-child { color: #d995ab; margin: 0; }
 .mnema-ib-relationship-heading strong { flex: 1; min-width: 0; font-size: 0.95em; font-weight: 500; }
 .mnema-ib-relationship-details[open] > summary .mnema-ib-chevron { transform: rotate(180deg); }
 .mnema-ib-relationship-details > summary .mnema-ib-meter { display: flex; align-items: center; gap: 10px; }
@@ -1654,14 +1688,50 @@ html[data-mnema-lang="en"] .mes.mnema-arc-message .ch_name .name_text::after { c
 .mnema-ib-relationship-content { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--SmartThemeBorderColor, #fff2); }
 .mnema-ib-relationship-content > .mnema-ib-note { margin: 0 0 12px; }
 .mnema-ib-relationship-content > .mnema-ib-meters { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; }
-.mnema-ib-relationship-content > .mnema-ib-next-step b { opacity: .85; }
-.mnema-ib-relationship-content > .mnema-ib-next-step > i { margin-right: 2px; color: var(--ib-accent); font-size: 0.85em; }
 .mnema-ib-relationship-heading > .mnema-ib-tag { flex: 0 0 auto; }
 .mnema-ib-meter.trust { --meter-color: #82b9dc; }
 .mnema-ib-meter.passion { --meter-color: #de8b94; }
 .mnema-ib-meter.devotion { --meter-color: #d6bc7c; }
 .mnema-ib-meter.attachment { --meter-color: #b39cda; }
 .mnema-ib-relationship-content .mnema-ib-meter b { color: var(--meter-color); }
+/* Relationship trail: every step of the ladder, so the current one is read
+   against what came before it and what is still ahead. The connecting line is a
+   border on the marker column, cut short on the last row. */
+/* Relationship trail: a scale of dots plus one card for the step in focus.
+   Every step stacked vertically weighed more than the rest of the plate put
+   together, and these titles are too long to sit side by side in a row. */
+.mnema-ib-trail { margin: 14px 0 18px; }
+/* A three-slot window: the focused step keeps the middle slot, its neighbours
+   take the sides. At either end of the ladder the missing neighbour leaves an
+   empty slot rather than sliding the focus off centre. */
+.mnema-ib-trail-rail { position: relative; width: max-content; max-width: 100%; margin: 0 auto; display: flex; align-items: center; justify-content: center; gap: 26px; padding: 4px 2px; }
+.mnema-ib-trail-rail::before { content: ''; position: absolute; left: 6px; right: 6px; top: 50%; height: 1px; background: var(--SmartThemeBorderColor, #fff2); }
+.mnema-ib-trail-slot { flex: 0 0 auto; width: 6px; height: 6px; }
+.mnema-ib-trail-slot[hidden], .mnema-ib-trail-dot[hidden] { display: none; }
+.mnema-ib-trail-dot { position: relative; flex: 0 0 auto; width: 6px; height: 6px; padding: 0; border: 1px solid var(--ib-accent); border-radius: 50%; background: var(--SmartThemeBlurTintColor, #1a1a26); cursor: pointer; transition: box-shadow 160ms ease, transform 160ms ease; }
+.mnema-ib-trail-dot[data-state="passed"] { background: var(--ib-accent); opacity: .5; }
+.mnema-ib-trail-dot[data-state="current"] { background: var(--ib-accent); }
+.mnema-ib-trail-dot[data-state="ahead"] { border-style: dashed; border-color: var(--SmartThemeBorderColor, #fff4); }
+.mnema-ib-trail-dot[aria-current="step"] { transform: scale(1.5); opacity: 1; box-shadow: 0 0 0 3px color-mix(in srgb, var(--ib-accent) 20%, transparent); }
+.mnema-ib-trail-dot:focus-visible { outline: 2px solid var(--ib-accent); outline-offset: 3px; }
+.mnema-ib-trail-view { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+.mnema-ib-trail-cards { flex: 1; min-width: 0; text-align: center; }
+.mnema-ib-trail-card > small { display: block; font-size: 0.72em; letter-spacing: .14em; text-transform: uppercase; opacity: .4; }
+.mnema-ib-trail-card > strong { display: block; margin-top: 3px; font-weight: 500; overflow-wrap: anywhere; }
+.mnema-ib-trail-card > p { margin: 5px 0 0; font-size: 0.88em; line-height: 1.45; opacity: .55; overflow-wrap: anywhere; }
+.mnema-ib-trail-card[data-state="current"] > strong { color: var(--ib-accent); font-weight: 600; }
+.mnema-ib-trail-card[data-state="passed"] { opacity: .6; }
+.mnema-ib-trail-nav { flex: 0 0 auto; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: inherit; font-size: 9px; opacity: .45; cursor: pointer; transition: background 160ms ease, opacity 160ms ease; }
+.mnema-ib-trail-nav:hover:not(:disabled) { opacity: 1; background: color-mix(in srgb, var(--ib-accent) 15%, transparent); }
+.mnema-ib-trail-nav:disabled { opacity: .15; cursor: default; }
+
+/* Next step: its own quiet card, so the one actionable line in the block stops
+   reading as another sentence of the paragraph above it. */
+.mnema-ib-next-step { margin: 10px 0 0; padding: 8px 10px; border-left: 2px solid var(--ib-accent); border-radius: 0 8px 8px 0; background: color-mix(in srgb, var(--ib-accent) 7%, transparent); }
+.mnema-ib-next-step > small { display: flex; align-items: center; gap: 6px; font-size: 0.72em; letter-spacing: .12em; text-transform: uppercase; opacity: .55; }
+.mnema-ib-next-step > small > :is(i, svg) { color: var(--ib-accent); font-size: 0.9em; opacity: .9; }
+.mnema-ib-next-step > p { margin: 5px 0 0; font-size: 0.92em; line-height: 1.5; opacity: .8; }
+.mnema-ib-tag.mnema-ib-ahead { border-style: dashed; opacity: 0.7; font-size: 0.8em; }
 .mnema-ib-note { margin: 9px 0 0; opacity: 0.65; font-size: 0.9em; line-height: 1.5; }
 .mnema-ib-reminder { display: flex; align-items: flex-start; gap: 13px; border-left: 3px solid var(--ib-accent); }
 .mnema-ib-date-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 0 0 46px; min-height: 52px; border-radius: 9px; background: color-mix(in srgb, var(--ib-accent) 12%, transparent); color: var(--ib-accent); }
@@ -1682,7 +1752,7 @@ html[data-mnema-lang="en"] .mes.mnema-arc-message .ch_name .name_text::after { c
 .mnema-ib-secrets > summary::marker { content: ''; }
 .mnema-ib-secrets > summary:hover { background: #ffffff06; }
 .mnema-ib-secret-heading { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.mnema-ib-secret-heading > i { display: grid; place-items: center; width: 30px; height: 30px; margin: 0; border-radius: 9px; color: var(--ib-accent); background: color-mix(in srgb, var(--ib-accent) 12%, transparent); }
+.mnema-ib-secret-heading > :is(i, svg) { box-sizing: border-box; display: grid; place-items: center; width: 30px; height: 30px; padding: 6px; margin: 0; border-radius: 9px; color: var(--ib-accent); background: color-mix(in srgb, var(--ib-accent) 12%, transparent); }
 .mnema-ib-secret-heading small { display: block; margin-top: 2px; font-size: 0.8em; font-weight: 400; opacity: 0.5; }
 .mnema-ib-secrets[open] > summary { border-bottom: 1px solid var(--SmartThemeBorderColor, #fff2); }
 .mnema-ib-secrets[open] > summary > .mnema-ib-chevron { transform: rotate(180deg); }
@@ -1698,7 +1768,7 @@ html[data-mnema-lang="en"] .mes.mnema-arc-message .ch_name .name_text::after { c
 .mnema-ib-secret-form > div { display: flex; flex-wrap: wrap; gap: 6px; }
 .mnema-ib-secrets .mnema-ib-list { gap: 6px; margin-top: 8px; }
 .mnema-ib-secrets .mnema-ib-list .mnema-ib-secret { flex-direction: row; gap: 10px; padding: 10px; border-radius: 8px; background: #ffffff05; }
-.mnema-ib-secret > i { margin-top: 4px; opacity: 0.45; font-size: 11px; }
+.mnema-ib-secret > :is(i, svg) { margin-top: 4px; opacity: 0.45; font-size: 11px; }
 .mnema-ib-secret > div { min-width: 0; flex: 1; }
 .mnema-ib-secret small { display: block; opacity: 0.45; font-size: 0.75em; }
 .mnema-ib-secret p { margin: 6px 0 0; opacity: 0.7; font-size: 0.9em; }
@@ -1713,16 +1783,29 @@ html[data-mnema-lang="en"] .mes.mnema-arc-message .ch_name .name_text::after { c
     .mnema-ib-chevron, .mnema-ib-meter .mnema-ib-track i, .mnema-ib-action.mnema-ib-icon { transition: none; }
 }
 
-/* Infoblock appearances: miniature headers and compact expandable content. */
-.mnema-ib[data-ib-theme] { --ib-accent: #b5a27e; box-sizing: border-box; width: min(100%, 320px); max-width: 100%; margin: 10px auto; font-size: 12px; line-height: 1.45; isolation: isolate; }
+/* Infoblock appearances. Shared here: only the chrome every theme keeps — header
+   metrics, secret columns, section ordering scaffolding. The block takes the
+   full width of the message: themes differ by where things sit, not by how hard
+   the plate is squeezed.
+
+   The body is a grid in every theme so `order` and `grid-column` work, and the
+   block is a size container so each theme can fold to one column on a narrow
+   message without depending on the viewport width. */
+.mnema-ib[data-ib-theme] { --ib-accent: #b5a27e; box-sizing: border-box; max-width: 100%; margin: 10px 0; font-size: 12px; line-height: 1.45; isolation: isolate; container-type: inline-size; container-name: mnemaib; }
 .mnema-ib[data-ib-theme] *, .mnema-ib-theme-picker * { box-sizing: border-box; }
+.mnema-ib[data-ib-theme] .mnema-ib-body { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; }
+.mnema-ib[data-ib-theme] .mnema-ib-body > .mnema-ib-section { min-width: 0; }
+/* Key/value rows, shared by every theme that uses them. A grid, not flex: the
+   section sets `overflow-wrap: anywhere`, so a flex key with nothing stopping it
+   from shrinking collapses to one character per line. The `auto` track plus
+   normal wrapping keeps the key on its own words, and the value stays flush left
+   — outfit lines are prose, and ragged-left prose is unreadable. */
+.mnema-ib[data-ib-theme] .mnema-ib-section > .mnema-ib-list > li { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; column-gap: 14px; }
+.mnema-ib[data-ib-theme] .mnema-ib-section > .mnema-ib-list > li b { overflow-wrap: normal; }
+.mnema-ib[data-ib-theme] .mnema-ib-section > .mnema-ib-list > li span { margin: 0; text-align: left; }
 .mnema-ib[data-ib-theme] .mnema-ib-head { padding: 9px 11px; gap: 9px; }
 .mnema-ib[data-ib-theme] .mnema-ib-place strong { white-space: normal; overflow-wrap: anywhere; font-size: 12px; font-weight: 500; }
 .mnema-ib[data-ib-theme] .mnema-ib-time strong { font-size: 17px; }
-.mnema-ib[data-ib-theme] .mnema-ib-body { display: flex; flex-direction: column; gap: 7px; padding: 8px; }
-.mnema-ib[data-ib-theme] .mnema-ib-section { padding: 9px; border-radius: 9px; }
-.mnema-ib[data-ib-theme] .mnema-ib-section h6 { margin-bottom: 7px; font-size: 10px; letter-spacing: .02em; }
-.mnema-ib[data-ib-theme] .mnema-ib-meters { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .mnema-ib[data-ib-theme] .mnema-ib-meter.trust { --meter-color: #8baf89; }
 .mnema-ib[data-ib-theme] .mnema-ib-meter.attachment { --meter-color: #c7a173; }
 .mnema-ib[data-ib-theme] .mnema-ib-actions { padding: 3px 8px; gap: 3px; }
@@ -1730,59 +1813,181 @@ html[data-mnema-lang="en"] .mes.mnema-arc-message .ch_name .name_text::after { c
 .mnema-ib[data-ib-theme] .mnema-ib-clock-face { font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1; letter-spacing: -.04em; }
 .mnema-ib[data-ib-theme] .mnema-ib-relationship-heading { flex-wrap: wrap; gap: 6px; }
 .mnema-ib[data-ib-theme] .mnema-ib-relationship-heading > .mnema-ib-tag { max-width: 100%; white-space: normal; }
-.mnema-ib[data-ib-theme] .mnema-ib-secret-columns { grid-template-columns: minmax(0, 1fr); gap: 7px; padding: 8px; }
+.mnema-ib[data-ib-theme] .mnema-ib-secret-columns { grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 8px; padding: 9px; }
 .mnema-ib[data-ib-theme] .mnema-ib-section.mnema-ib-secrets-section { padding: 0; }
 .mnema-ib[data-ib-theme] .mnema-ib-secrets > summary { padding: 9px; gap: 8px; }
 .mnema-ib[data-ib-theme] .mnema-ib-secret-heading { gap: 7px; }
-.mnema-ib[data-ib-theme] .mnema-ib-secret-heading > i { width: 24px; height: 24px; border-radius: 7px; }
-.mnema-ib[data-ib-theme] .mnema-ib-date-tile { flex-basis: 35px; min-height: 40px; border-radius: 6px; }
-.mnema-ib[data-ib-theme] .mnema-ib-date-tile b { font-size: 19px; }
-.mnema-ib[data-ib-theme] .mnema-ib-reminder { gap: 9px; }
-.mnema-ib[data-ib-theme] .mnema-ib-note { margin-top: 6px; }
-.mnema-ib[data-ib-theme] .mnema-ib-body .mnema-ib-list li { padding: 4px 0; }
+.mnema-ib[data-ib-theme] .mnema-ib-secret-heading > :is(i, svg) { width: 24px; height: 24px; border-radius: 7px; }
 
-/* Clock: aligned clock/date columns above a small location capsule. */
-.mnema-ib[data-ib-theme="glass"] { --ib-accent: #a7bda5; --SmartThemeBorderColor: color-mix(in srgb, currentColor 16%, transparent); width: min(100%, 280px); border: 0; border-radius: 0; background: transparent; box-shadow: none; overflow: visible; }
-.mnema-ib[data-ib-theme="glass"] .mnema-ib-glass-head { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: 8px 10px; padding: 5px 0 0; }
-.mnema-ib[data-ib-theme="glass"] .mnema-ib-clock-face { font-size: 32px; font-weight: 300; align-self: center; padding-left: 7px; }
+/* Compact: a spec sheet. One column, but each section is a single wide row —
+   heading in a fixed label gutter on the left, every value aligned in one column
+   on the right. Reading order is the plain one: what they wear, how they are,
+   where they stand, what is next. */
+.mnema-ib[data-ib-theme="classic"] { border-radius: 8px; }
+.mnema-ib[data-ib-theme="classic"] .mnema-ib-body { padding: 0; }
+.mnema-ib[data-ib-theme="classic"] .mnema-ib-outfits { order: 1; }
+.mnema-ib[data-ib-theme="classic"] .mnema-ib-vitals { order: 2; }
+.mnema-ib[data-ib-theme="classic"] .mnema-ib-relationship { order: 3; }
+.mnema-ib[data-ib-theme="classic"] .mnema-ib-plan-section { order: 4; }
+.mnema-ib[data-ib-theme="classic"] .mnema-ib-secrets-section { order: 5; }
+.mnema-ib[data-ib-theme="classic"] .mnema-ib-section { display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: start; column-gap: 14px; padding: 8px 12px; border: 0; border-top: 1px solid var(--SmartThemeBorderColor, #fff2); border-radius: 0; background: transparent; }
+.mnema-ib[data-ib-theme="classic"] .mnema-ib-body > .mnema-ib-section:first-child { border-top: 0; }
+.mnema-ib[data-ib-theme="classic"] .mnema-ib-section > * { grid-column: 2; }
+/* The heading spans every row of its own section, so a tall value column keeps a
+   single label beside it rather than repeating one per row. */
+.mnema-ib[data-ib-theme="classic"] .mnema-ib-section > h6 { grid-column: 1; grid-row: 1 / span 30; margin: 0; padding-top: 1px; font-size: 10px; font-weight: 500; line-height: 1.35; letter-spacing: 0; opacity: .5; }
+.mnema-ib[data-ib-theme="classic"] .mnema-ib-section > h6 :is(i, svg) { display: none; }
+/* Headings that carry a button need the full width: 64px would crush them. */
+.mnema-ib[data-ib-theme="classic"] .mnema-ib-section > h6.mnema-ib-head-row { grid-column: 1 / -1; grid-row: auto; margin-bottom: 4px; }
+.mnema-ib[data-ib-theme="classic"] .mnema-ib-relationship, .mnema-ib[data-ib-theme="classic"] .mnema-ib-secrets-section { display: block; }
+.mnema-ib[data-ib-theme="classic"] .mnema-ib-section > .mnema-ib-list > li { padding: 2px 0; }
+/* One-line meters: label, bar and value share a row instead of stacking. */
+.mnema-ib[data-ib-theme="classic"] .mnema-ib-meters { grid-template-columns: minmax(0, 1fr); gap: 5px; }
+.mnema-ib[data-ib-theme="classic"] .mnema-ib-meters .mnema-ib-meter { display: grid; grid-template-columns: 56px minmax(0, 1fr) 26px; align-items: center; column-gap: 7px; }
+.mnema-ib[data-ib-theme="classic"] .mnema-ib-meters .mnema-ib-meter > div:first-child { display: contents; }
+.mnema-ib[data-ib-theme="classic"] .mnema-ib-meters .mnema-ib-meter span { grid-column: 1; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mnema-ib[data-ib-theme="classic"] .mnema-ib-meters .mnema-ib-meter b { grid-column: 3; font-size: 10px; text-align: right; }
+.mnema-ib[data-ib-theme="classic"] .mnema-ib-meters .mnema-ib-track { grid-column: 2; height: 4px; }
+.mnema-ib[data-ib-theme="classic"] .mnema-ib-mood { margin: 0 0 6px; }
+.mnema-ib[data-ib-theme="classic"] .mnema-ib-note { margin-top: 4px; font-size: 10px; }
+.mnema-ib[data-ib-theme="classic"] .mnema-ib-reminder { border-left: 0; }
+.mnema-ib[data-ib-theme="classic"] .mnema-ib-reminder > .mnema-ib-date-tile { grid-column: 1; flex-direction: row; align-items: baseline; justify-content: flex-start; gap: 4px; flex-basis: auto; min-height: 0; padding-top: 1px; background: transparent; border-radius: 0; }
+.mnema-ib[data-ib-theme="classic"] .mnema-ib-reminder > .mnema-ib-date-tile b { font-size: 14px; }
+
+/* Clock: a widget, not a panel. Everything is centred on one axis, the numbers
+   carry the meaning and the labels shrink under them; sections are separated by
+   air and a short hairline rather than by boxes. */
+/* Clock borrows the user's own theme instead of carrying a colour of its own:
+   it has no plate, no border and no background, so an invented accent had
+   nothing to belong to and simply tinted everything green. Semantic colours —
+   metric hues, severity, mood tone, the critical alert — keep their own values;
+   only the decorative accent follows the theme. */
+.mnema-ib[data-ib-theme="glass"] { --ib-accent: var(--SmartThemeQuoteColor, #b5a2d8); --SmartThemeBorderColor: color-mix(in srgb, currentColor 16%, transparent); border: 0; border-radius: 0; background: transparent; box-shadow: none; overflow: visible; }
+/* A column of two centred rows. Not a grid: the full-width capsule would hand
+   its width to the tracks holding the clock, and there would be no slack left
+   to centre them with. */
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-glass-head { display: flex; flex-direction: column; align-items: center; gap: 9px; padding: 5px 0 0; }
+.mnema-ib-glass-time { display: flex; align-items: center; gap: 10px; max-width: 100%; }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-clock-face { font-size: 32px; font-weight: 300; align-self: center; }
 .mnema-ib-glass-meta { min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 3px; border-left: 1px solid var(--SmartThemeBorderColor); padding: 1px 7px 1px 10px; font-size: 10px; line-height: 1.35; overflow-wrap: anywhere; }
 .mnema-ib-glass-meta > span { font-variant-numeric: tabular-nums; }
 .mnema-ib-glass-meta small { color: inherit; font-size: 10px; opacity: .7; }
-.mnema-ib-glass-place { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 10px; border: 1px solid var(--SmartThemeBorderColor); border-radius: 12px; background: color-mix(in srgb, currentColor 4%, transparent); }
+/* Hugs its label rather than spanning the block: justify-self keeps the capsule
+   at content width, the max-width stops a long place name from reaching the
+   edges anyway. */
+.mnema-ib-glass-place { max-width: min(100%, 440px); display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 14px; border: 1px solid var(--SmartThemeBorderColor); border-radius: 12px; background: color-mix(in srgb, currentColor 4%, transparent); }
 .mnema-ib-glass-place strong { font-size: 11px; font-weight: 450; text-align: center; overflow-wrap: anywhere; }
-.mnema-ib-glass-place > i { opacity: .6; font-size: 10px; }
+.mnema-ib-glass-place > :is(i, svg) { opacity: .6; font-size: 10px; }
 .mnema-ib[data-ib-theme="glass"] .mnema-ib-details > summary:hover { background: transparent; }
-.mnema-ib[data-ib-theme="glass"] .mnema-ib-body { padding: 6px 0 0; gap: 7px; }
-.mnema-ib[data-ib-theme="glass"] .mnema-ib-section { border-radius: 12px; background: color-mix(in srgb, currentColor 3%, transparent); }
-.mnema-ib[data-ib-theme="glass"] .mnema-ib-section > h6 { text-align: center; }
-.mnema-ib[data-ib-theme="glass"] .mnema-ib-body .mnema-ib-list > li { align-items: center; text-align: center; }
-.mnema-ib[data-ib-theme="glass"] .mnema-ib-actions { justify-content: center; border: 0; padding: 5px 0 0; }
-.mnema-ib[data-ib-theme="glass"] .mnema-ib-secrets .mnema-ib-list > li { text-align: left; align-items: flex-start; }
+/* Time leads here, so the plan comes first and the numbers are the big type.
+   Wide enough, the block splits: readings on the left, a narrow summary rail on
+   the right. Everything stays flush left — centred text made the numerals drift
+   off their own axis. */
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-plan-section { order: 1; }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-vitals { order: 2; }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-relationship { order: 3; }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-outfits { order: 4; }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-secrets-section { order: 5; }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-body { padding: 14px 0 0; gap: 18px; }
+/* Nothing here is a filled card, so a section has no reason to stretch to its
+   row — it would only push its own content around. Frost and Terminal must keep
+   stretching: their 1px gaps are drawn by the body background behind the cells. */
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-body > .mnema-ib-section { align-self: start; }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-section { padding: 0; border: 0; border-radius: 0; background: transparent; }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-section > h6, .mnema-ib[data-ib-theme="glass"] .mnema-ib-reminder h6 { margin: 0 0 10px; padding-bottom: 7px; border-bottom: 1px solid var(--SmartThemeBorderColor); font-size: 9px; font-weight: 500; letter-spacing: .16em; text-transform: uppercase; opacity: .45; }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-section > h6 :is(i, svg), .mnema-ib[data-ib-theme="glass"] .mnema-ib-reminder h6 > span > :is(i, svg) { display: none; }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-section > .mnema-ib-list > li { padding: 5px 0; }
+/* Value first and large, label beneath it: the widget reading of a meter. */
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-meters { grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 16px 18px; }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-meters .mnema-ib-meter > div:first-child { flex-direction: column; align-items: flex-start; justify-content: flex-end; gap: 1px; margin-bottom: 8px; }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-meters .mnema-ib-meter b { order: -1; font-size: 26px; font-weight: 200; line-height: 1; letter-spacing: -.03em; }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-meters .mnema-ib-meter span { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; opacity: .45; }
+/* Every bar in this theme is a hairline — the phase meter in the relationship
+   summary and the disclosure meter in a secret column sat at 6px and were the
+   only heavy strokes left. */
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-track { height: 2px; background: color-mix(in srgb, currentColor 12%, transparent); }
+/* Top-aligned, never centred: this section shares a grid row with the
+   relationship block, so when that one is expanded the row grows and any
+   centred content here drifts into the middle of the empty height. */
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-reminder { align-items: flex-start; gap: 14px; border-left: 0; }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-reminder > div:last-child { flex: 1; }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-reminder strong { display: block; font-size: 15px; font-weight: 400; }
+/* Centred against the text beside it, which is safe only because the section is
+   `align-self: start` and therefore exactly as tall as its own content — align
+   the whole flex container instead and an expanded neighbour drags this down. */
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-date-tile { align-self: center; flex: 0 0 auto; min-height: 0; padding: 7px 13px; border-radius: 4px; }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-date-tile b { font-size: 24px; font-weight: 200; }
+.mnema-ib[data-ib-theme="glass"] .mnema-ib-actions { justify-content: flex-end; border: 0; padding: 6px 0 0; }
 
-/* Frost: a single translucent lens with a soft blur and light-catching edges. */
+/* Frost: a single translucent lens with a soft blur and light-catching edges.
+   The body is one uninterrupted pane — no inner cards would survive the blur —
+   so sections are edge-to-edge rows split by hairlines, with values flushed
+   right against their keys. Roomy on purpose: this is the airy theme. */
 .mnema-ib[data-ib-theme="frost"] { --ib-accent: #b9c3a6; --SmartThemeBorderColor: color-mix(in srgb, currentColor 17%, transparent); background: linear-gradient(125deg, #ffffff20, #ffffff03 45%, #d8d7bd12), color-mix(in srgb, var(--SmartThemeBlurTintColor, #24251f) 18%, transparent); border: 1px solid #ffffff30; border-bottom-color: #ffffff14; border-radius: 15px; backdrop-filter: blur(20px) saturate(135%); -webkit-backdrop-filter: blur(20px) saturate(135%); box-shadow: inset 0 1px 0 #ffffff38, inset 1px 0 0 #ffffff0c, 0 5px 16px #00000014; overflow: hidden; }
 .mnema-ib[data-ib-theme="frost"] .mnema-ib-frost-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 12px; padding: 10px 12px; }
 .mnema-ib-frost-place { min-width: 0; display: flex; align-items: center; gap: 6px; }
 .mnema-ib-frost-place strong { font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
-.mnema-ib-frost-place > i { font-size: 10px; opacity: .6; }
+.mnema-ib-frost-place > :is(i, svg) { font-size: 10px; opacity: .6; }
 .mnema-ib[data-ib-theme="frost"] .mnema-ib-clock-face { grid-column: 2; grid-row: 1 / 3; font-size: 26px; font-weight: 300; }
 .mnema-ib-frost-meta { min-width: 0; display: flex; flex-wrap: wrap; gap: 2px 8px; font-size: 10px; opacity: .7; }
 .mnema-ib-frost-meta small { color: inherit; font-size: inherit; }
-.mnema-ib[data-ib-theme="frost"] .mnema-ib-section { border-color: #ffffff14; background: #ffffff05; border-radius: 10px; }
+/* Mood leads: the lens opens on the relationship, then the body, then the
+   surface details. Wide enough it becomes a two-column tile field. */
+.mnema-ib[data-ib-theme="frost"] .mnema-ib-relationship { order: 1; }
+.mnema-ib[data-ib-theme="frost"] .mnema-ib-vitals { order: 2; }
+.mnema-ib[data-ib-theme="frost"] .mnema-ib-outfits { order: 3; }
+.mnema-ib[data-ib-theme="frost"] .mnema-ib-plan-section { order: 4; }
+.mnema-ib[data-ib-theme="frost"] .mnema-ib-secrets-section { order: 5; }
+.mnema-ib[data-ib-theme="frost"] .mnema-ib-body { padding: 0; gap: 0; }
+.mnema-ib[data-ib-theme="frost"] .mnema-ib-section { padding: 13px 14px; border: 0; border-top: 1px solid #ffffff14; border-radius: 0; background: transparent; }
+.mnema-ib[data-ib-theme="frost"] .mnema-ib-body > .mnema-ib-section:first-child { border-top: 0; }
+.mnema-ib[data-ib-theme="frost"] .mnema-ib-relationship { border-top: 0; }
+.mnema-ib[data-ib-theme="frost"] .mnema-ib-section > h6, .mnema-ib[data-ib-theme="frost"] .mnema-ib-reminder h6 { margin: 0 0 11px; font-size: 9px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; opacity: .5; }
+.mnema-ib[data-ib-theme="frost"] .mnema-ib-section > .mnema-ib-list > li { padding: 7px 0; }
+.mnema-ib[data-ib-theme="frost"] .mnema-ib-section > .mnema-ib-list > li + li { border-top: 1px solid #ffffff0d; }
+.mnema-ib[data-ib-theme="frost"] .mnema-ib-meters { grid-template-columns: minmax(0, 1fr); gap: 11px; }
+.mnema-ib[data-ib-theme="frost"] .mnema-ib-meters .mnema-ib-meter > div:first-child { margin-bottom: 5px; font-size: 10px; }
+.mnema-ib[data-ib-theme="frost"] .mnema-ib-meters .mnema-ib-track { height: 3px; background: #ffffff14; }
+.mnema-ib[data-ib-theme="frost"] .mnema-ib-reminder { align-items: center; gap: 13px; border-left: 0; }
+.mnema-ib[data-ib-theme="frost"] .mnema-ib-date-tile { flex-basis: 42px; min-height: 46px; border-radius: 12px; background: #ffffff0f; color: inherit; }
 .mnema-ib[data-ib-theme="frost"] .mnema-ib-actions { background: #ffffff04; border-color: #ffffff14; }
 .mnema-ib[data-ib-theme="frost"] .mnema-ib-secret-column { background: #ffffff04; }
 
-/* Journal: a pocket notebook with a small serif title and ruled sections. */
-.mnema-ib[data-ib-theme="journal"] { --ib-accent: #926039; --SmartThemeTextColor: #3e382c; --SmartThemeBorderColor: #d0c1a5; width: min(100%, 300px); color: #3e382c; background: #f1e8d6; background-image: repeating-linear-gradient(0deg, #8c714404 0px, #8c714404 1px, transparent 1px, transparent 4px); border: 1px solid #d0c1a5; border-radius: 2px 2px 9px 2px; box-shadow: 2px 2px 0 #c4b59933; text-shadow: none; font-family: Georgia, 'Times New Roman', serif; }
+/* Journal: a pocket notebook. Sections read as diary entries — a serif caption
+   trailing a rule, then running text: list rows become em-dashed lines with the
+   value in italics, not a right-aligned data column. */
+.mnema-ib[data-ib-theme="journal"] { --ib-accent: #926039; --SmartThemeTextColor: #3e382c; --SmartThemeBorderColor: #d0c1a5; color: #3e382c; background: #f1e8d6; background-image: repeating-linear-gradient(0deg, #8c714404 0px, #8c714404 1px, transparent 1px, transparent 4px); border: 1px solid #d0c1a5; border-radius: 2px 2px 9px 2px; box-shadow: 2px 2px 0 #c4b59933; text-shadow: none; font-family: Georgia, 'Times New Roman', serif; }
 .mnema-ib[data-ib-theme="journal"] .mnema-ib-journal-head { display: block; padding: 8px 11px; }
 .mnema-ib-journal-dateline { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; padding-bottom: 4px; border-bottom: 1px solid #c9b99b; font: 10px/1.3 system-ui, sans-serif; }
 .mnema-ib-journal-place { padding: 5px 0 4px; font-size: 18px; line-height: 1.15; font-weight: 500; overflow-wrap: anywhere; }
 .mnema-ib-journal-footer { border-top: 1px solid #d8cbb3; padding-top: 3px; }
 .mnema-ib-journal-footer > small { font: 10px/1.3 system-ui, sans-serif; }
-.mnema-ib[data-ib-theme="journal"] :is(small, button, i) { color: inherit; }
-.mnema-ib[data-ib-theme="journal"] .mnema-ib-body { padding: 0 11px 10px; gap: 9px; }
-.mnema-ib[data-ib-theme="journal"] .mnema-ib-section { border: 0; border-top: 1px solid #c9b99b; border-radius: 0; background: transparent; padding: 8px 0 0; }
-.mnema-ib[data-ib-theme="journal"] .mnema-ib-section h6 { color: #785638; font: 600 10px/1.4 system-ui, sans-serif; opacity: 1; }
+.mnema-ib[data-ib-theme="journal"] :is(small, button, i, svg) { color: inherit; }
+/* A diary entry reads in the order it was lived: how she felt, what she wore,
+   who she met, what is promised. Stays one column at any width — running text
+   in two columns would have to be re-read, not read. */
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-vitals { order: 1; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-outfits { order: 2; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-relationship { order: 3; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-plan-section { order: 4; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-secrets-section { order: 5; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-body { padding: 2px 15px 14px; gap: 0; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-section { padding: 10px 0; border: 0; border-radius: 0; background: transparent; line-height: 1.65; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-section + .mnema-ib-section { border-top: 1px solid #c9b99b66; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-section > h6, .mnema-ib[data-ib-theme="journal"] .mnema-ib-reminder h6 { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; color: #785638; font: italic 400 12px/1.4 Georgia, 'Times New Roman', serif; letter-spacing: 0; opacity: 1; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-section > h6 :is(i, svg), .mnema-ib[data-ib-theme="journal"] .mnema-ib-reminder h6 > span > :is(i, svg) { display: none; }
+/* The caption trails off into a rule — only where no button sits on that line. */
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-section > h6:not(.mnema-ib-head-row)::after { content: ''; flex: 1; height: 1px; background: #c9b99b; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-section > .mnema-ib-list { gap: 2px; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-section > .mnema-ib-list > li { display: block; padding: 2px 0 2px 13px; text-indent: -13px; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-section > .mnema-ib-list > li::before { content: '— '; opacity: .5; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-section > .mnema-ib-list > li b { font-weight: 600; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-section > .mnema-ib-list > li b::after { content: ':'; font-weight: 400; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-section > .mnema-ib-list > li span { margin-left: 5px; font-style: italic; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-meters { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px 14px; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-meters .mnema-ib-meter > div:first-child { margin-bottom: 3px; font: italic 11px/1.3 Georgia, 'Times New Roman', serif; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-meters .mnema-ib-meter b { font: 500 11px/1.3 Georgia, 'Times New Roman', serif; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-mood { margin: 0 0 8px; font-style: italic; }
 .mnema-ib[data-ib-theme="journal"] .mnema-ib-actions { border-bottom: 0; margin: 0 11px; padding: 3px 0; justify-content: flex-start; }
 .mnema-ib[data-ib-theme="journal"] .mnema-ib-meter.trust { --meter-color: #59744b; }
 .mnema-ib[data-ib-theme="journal"] .mnema-ib-meter.passion { --meter-color: #a75549; }
@@ -1790,12 +1995,21 @@ html[data-mnema-lang="en"] .mes.mnema-arc-message .ch_name .name_text::after { c
 .mnema-ib[data-ib-theme="journal"] .mnema-ib-meter.attachment { --meter-color: #83643d; }
 .mnema-ib[data-ib-theme="journal"] .mnema-ib-meter .mnema-ib-track { border-radius: 0; height: 3px; background: #daceb7; }
 .mnema-ib[data-ib-theme="journal"] .mnema-ib-note, .mnema-ib[data-ib-theme="journal"] .mnema-ib-list li span { opacity: .85; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-reminder { gap: 11px; border-left: 0; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-date-tile { flex-basis: 34px; min-height: 0; padding-top: 2px; border-right: 1px solid #c9b99b; background: transparent; color: #785638; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-date-tile b { font: 600 20px/1 Georgia, 'Times New Roman', serif; }
+/* Ink markers on paper: the dot is punched out of the page, not floated over it. */
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-trail-dot { background: #f1e8d6; border-color: #926039; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-trail-dot[data-state="passed"], .mnema-ib[data-ib-theme="journal"] .mnema-ib-trail-dot[data-state="current"] { background: #926039; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-trail-rail::before { background: #c9b99b; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-trail-card[data-state="current"] > strong { color: #785638; }
 .mnema-ib[data-ib-theme="journal"] .mnema-ib-secret-column { background: #e8dcc566; border-radius: 2px; }
-.mnema-ib[data-ib-theme="journal"] .mnema-ib-tag, .mnema-ib[data-ib-theme="journal"] .mnema-ib-date-tile { border-radius: 2px; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-tag, .mnema-ib[data-ib-theme="journal"] .mnema-ib-date-tile, .mnema-ib[data-ib-theme="journal"] .mnema-ib-mood { border-radius: 2px; }
 .mnema-ib[data-ib-theme="journal"] .mnema-ib-secret-form textarea { background: #fff8e9; }
-.mnema-ib[data-ib-theme="journal"] .mnema-ib-warning { color: #9d3e32; }
 
-/* Terminal: a narrow amber readout with compact dashboard rows. */
+/* Terminal: an instrument readout. Rows are LABEL·······VALUE with dotted
+   leaders, micro uppercase keys and segmented bars — a table of data, where the
+   hairline grid between sections stands in for cell borders. */
 .mnema-ib[data-ib-theme="terminal"] { --ib-accent: #e7b263; --SmartThemeTextColor: #e2dccd; --SmartThemeBorderColor: #45443a; color: #e2dccd; background: #232521; border: 1px solid #45443a; border-top: 2px solid #c79752; border-radius: 3px; box-shadow: 0 4px 12px #0002; text-shadow: none; font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; }
 .mnema-ib[data-ib-theme="terminal"] .mnema-ib-terminal-head { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; padding: 9px 10px; gap: 10px; }
 .mnema-ib[data-ib-theme="terminal"] .mnema-ib-clock-face { color: #efbd70; font-size: 24px; letter-spacing: -.06em; padding-right: 10px; border-right: 1px solid #45443a; }
@@ -1803,14 +2017,80 @@ html[data-mnema-lang="en"] .mes.mnema-arc-message .ch_name .name_text::after { c
 .mnema-ib-terminal-place { min-width: 0; overflow-wrap: anywhere; }
 .mnema-ib-terminal-place strong { display: block; font-size: 11px; font-weight: 500; line-height: 1.35; }
 .mnema-ib-terminal-place small { display: block; margin-top: 3px; color: #b3b2a5; font-size: 10px; }
-.mnema-ib[data-ib-theme="terminal"] .mnema-ib-body { gap: 1px; padding: 1px; background: #45443a; }
-.mnema-ib[data-ib-theme="terminal"] .mnema-ib-section { background: #232521; border: 0; border-radius: 0; padding: 9px; }
-.mnema-ib[data-ib-theme="terminal"] .mnema-ib-section h6 { color: #efbd70; opacity: .9; font-size: 10px; }
+/* A readout puts the instruments first: vitals, then the relationship gauges,
+   then the schedule; plain text sinks to the bottom. Widens into a real
+   dashboard grid, where the 1px gaps double as cell borders. */
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-vitals { order: 1; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-relationship { order: 2; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-plan-section { order: 3; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-outfits { order: 4; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-secrets-section { order: 5; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-body { gap: 1px; padding: 1px 0 0; background: #45443a; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-section { padding: 8px 10px; border: 0; border-radius: 0; background: #232521; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-section > h6, .mnema-ib[data-ib-theme="terminal"] .mnema-ib-reminder h6 { margin: 0 0 7px; color: #efbd70; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; opacity: .85; }
+/* The value is capped at 60% so a long outfit line wraps inside its own column
+   instead of squeezing the leader out of existence. */
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-section > .mnema-ib-list > li { display: grid; grid-template-columns: auto minmax(14px, 1fr) minmax(0, 60%); align-items: baseline; gap: 0 8px; padding: 3px 0; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-section > .mnema-ib-list > li b { grid-column: 1; color: #b3b2a5; font-size: 10px; font-weight: 400; letter-spacing: .06em; text-transform: uppercase; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-section > .mnema-ib-list > li::after { content: ''; grid-column: 2; align-self: center; border-bottom: 1px dotted #55544a; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-section > .mnema-ib-list > li span { grid-column: 3; margin: 0; font-size: 11px; opacity: .95; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-meters { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-meters .mnema-ib-meter > div:first-child { margin-bottom: 4px; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-meters .mnema-ib-meter b { color: #efbd70; font-size: 10px; text-transform: none; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-meters .mnema-ib-track { height: 7px; background: #1c1e1b; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-note { margin-top: 6px; font-size: 10px; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-reminder { gap: 10px; border-left: 0; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-date-tile { flex-basis: 38px; min-height: 42px; border: 1px solid #45443a; background: #1c1e1b; color: #efbd70; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-date-tile b { font-size: 18px; }
 .mnema-ib[data-ib-theme="terminal"] .mnema-ib-actions { justify-content: flex-start; border-bottom: 0; background: #1c1e1b; }
 .mnema-ib[data-ib-theme="terminal"] .mnema-ib-track { border-radius: 0; }
 .mnema-ib[data-ib-theme="terminal"] .mnema-ib-track i { border-radius: 0; background-image: repeating-linear-gradient(90deg, transparent 0px, transparent 5px, #232521 5px, #232521 7px); }
+/* Square markers and a hard rule: the readout has no round corners anywhere. */
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-trail-dot { border-radius: 0; background: #232521; border-color: #c79752; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-trail-dot[data-state="passed"], .mnema-ib[data-ib-theme="terminal"] .mnema-ib-trail-dot[data-state="current"] { background: #efbd70; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-trail-rail::before { background: #45443a; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-trail-card > strong { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
 .mnema-ib[data-ib-theme="terminal"] .mnema-ib-secret-column { border-radius: 2px; background: #1c1e1b; }
-.mnema-ib[data-ib-theme="terminal"] .mnema-ib-date-tile, .mnema-ib[data-ib-theme="terminal"] .mnema-ib-tag, .mnema-ib[data-ib-theme="terminal"] .mnema-ib-action { border-radius: 2px; }
+.mnema-ib[data-ib-theme="terminal"] .mnema-ib-date-tile, .mnema-ib[data-ib-theme="terminal"] .mnema-ib-tag, .mnema-ib[data-ib-theme="terminal"] .mnema-ib-action, .mnema-ib[data-ib-theme="terminal"] .mnema-ib-mood { border-radius: 2px; }
+/* Where the themes actually part ways. Below this width every theme is a single
+   column — there is no honest way to split 300px. Above it each one claims the
+   room differently: Compact widens its label gutter and stays one column, Clock
+   splits into readings plus a summary rail, Frost tiles, Terminal becomes a
+   dashboard grid, Journal deliberately refuses to split. */
+@container mnemaib (min-width: 420px) {
+    .mnema-ib[data-ib-theme="classic"] .mnema-ib-section { grid-template-columns: 124px minmax(0, 1fr); column-gap: 18px; }
+    .mnema-ib[data-ib-theme="classic"] .mnema-ib-meters { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 6px 22px; }
+    .mnema-ib[data-ib-theme="classic"] .mnema-ib-meters .mnema-ib-meter { grid-template-columns: 96px minmax(0, 1fr) 32px; }
+    .mnema-ib[data-ib-theme="terminal"] .mnema-ib-body { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .mnema-ib[data-ib-theme="terminal"] .mnema-ib-vitals, .mnema-ib[data-ib-theme="terminal"] .mnema-ib-secrets-section { grid-column: 1 / -1; }
+}
+@container mnemaib (min-width: 520px) {
+    .mnema-ib[data-ib-theme="frost"] .mnema-ib-body { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 1px; background: #ffffff14; }
+    .mnema-ib[data-ib-theme="frost"] .mnema-ib-section { background: color-mix(in srgb, var(--SmartThemeBlurTintColor, #24251f) 14%, transparent); }
+    .mnema-ib[data-ib-theme="frost"] .mnema-ib-relationship, .mnema-ib[data-ib-theme="frost"] .mnema-ib-secrets-section { grid-column: 1 / -1; }
+    .mnema-ib[data-ib-theme="frost"] .mnema-ib-meters { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px 20px; }
+}
+@container mnemaib (min-width: 560px) {
+    /* Columns are auto-fit, not hand-assigned: half these sections only render
+       when their tracking is on, and pinning them to a fixed side leaves a hole
+       the width of the block whenever one is missing. */
+    .mnema-ib[data-ib-theme="glass"] .mnema-ib-body { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); column-gap: 30px; }
+    .mnema-ib[data-ib-theme="glass"] .mnema-ib-secrets-section { grid-column: 1 / -1; }
+}
+@container mnemaib (min-width: 660px) {
+    .mnema-ib[data-ib-theme="terminal"] .mnema-ib-body { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .mnema-ib[data-ib-theme="terminal"] .mnema-ib-vitals { grid-column: span 2; }
+    .mnema-ib[data-ib-theme="terminal"] .mnema-ib-secret-columns { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* The alert lives inside the meter label, and that label is dimmed with opacity
+   in several themes — opacity applies to the whole subtree, so the filled icon
+   would fade with the text. Where an alert is present we dim the label through
+   a transparent colour instead and let the icon keep its own. Placed after every
+   theme block so it outranks their label rules. */
+.mnema-ib[data-ib-theme] .mnema-ib-meters .mnema-ib-meter span:has(.mnema-ib-alarm),
+.mnema-ib .mnema-ib-meter span:has(.mnema-ib-alarm) { opacity: 1; color: color-mix(in srgb, currentColor 58%, transparent); }
+
 /* Theme picker: native radios remain keyboard-accessible. */
 .mnema-ib-theme-picker { min-width: 0; margin: 18px 0; padding: 16px; border: 1px solid var(--mnema-border-soft, #8884); border-radius: 14px; }
 .mnema-ib-theme-picker legend { padding: 0 8px; font-size: 13px; }
@@ -1825,16 +2105,23 @@ html[data-mnema-lang="en"] .mes.mnema-arc-message .ch_name .name_text::after { c
 .mnema-ib-theme-sample { height: 54px; padding: 8px; display: grid; gap: 5px; align-content: center; border-radius: 6px; background: #353632; color: #e1ddcf; }
 .mnema-ib-theme-sample b { font: 500 16px/1.2 system-ui, sans-serif; }
 .mnema-ib-theme-sample i { height: 3px; width: 65%; background: currentColor; opacity: .25; border-radius: 2px; }
-.mnema-ib-theme-sample[data-theme="classic"] { grid-template-columns: 1fr 1fr; }
+/* Each sample echoes its theme's body rhythm: dense rows, centred stack, airy
+   rows, ruled entries, segmented readout. */
+.mnema-ib-theme-sample[data-theme="classic"] { grid-template-columns: 1fr 1fr; gap: 3px; }
 .mnema-ib-theme-sample[data-theme="classic"] b { grid-column: 2; grid-row: 1 / 4; text-align: right; }
-.mnema-ib-theme-sample[data-theme="glass"] { background: linear-gradient(125deg, #87918044, #d4d3bc11); border: 1px solid #c5cdb54d; color: inherit; justify-items: center; }
+.mnema-ib-theme-sample[data-theme="classic"] i { width: 100%; height: 2px; }
+/* Neutral, like the theme itself: it takes its accent from SillyTavern. */
+.mnema-ib-theme-sample[data-theme="glass"] { background: transparent; border: 1px solid color-mix(in srgb, currentColor 18%, transparent); color: inherit; }
 .mnema-ib-theme-sample[data-theme="glass"] b { font-size: 22px; font-weight: 300; }
-.mnema-ib-theme-sample[data-theme="glass"] i { width: 42%; }
+.mnema-ib-theme-sample[data-theme="glass"] i { width: 58%; height: 2px; }
 .mnema-ib-theme-sample[data-theme="glass"] i:last-child { display: none; }
 .mnema-ib-theme-sample[data-theme="journal"] { background: #f1e8d6; color: #735338; border-radius: 1px; grid-template-columns: 1fr 1fr; }
-.mnema-ib-theme-sample[data-theme="journal"] b { grid-column: 1 / -1; font-family: Georgia, serif; border-bottom: 1px solid #a7916b; padding-bottom: 5px; }
+.mnema-ib-theme-sample[data-theme="journal"] b { grid-column: 1 / -1; font-family: Georgia, serif; font-style: italic; border-bottom: 1px solid #a7916b; padding-bottom: 5px; }
+.mnema-ib-theme-sample[data-theme="journal"] i { border-radius: 0; width: 100%; }
+.mnema-ib-theme-sample[data-theme="journal"] i:last-child { width: 55%; }
 .mnema-ib-theme-sample[data-theme="terminal"] { background: #232521; color: #efbd70; border-top: 2px solid #c79752; border-radius: 1px; grid-template-columns: 1fr 1fr; }
 .mnema-ib-theme-sample[data-theme="terminal"] b { grid-row: 1 / 4; font-family: ui-monospace, monospace; }
+.mnema-ib-theme-sample[data-theme="terminal"] i { width: 100%; border-radius: 0; opacity: .5; background-image: repeating-linear-gradient(90deg, transparent 0, transparent 4px, #232521 4px, #232521 6px); }
 .mnema-ib-theme-sample[data-theme="frost"] { grid-template-columns: 1fr 1fr; background: linear-gradient(120deg, #d9dfcc33, #ffffff08); color: inherit; border: 1px solid #ffffff38; border-radius: 10px; box-shadow: inset 0 1px 0 #ffffff40; }
 .mnema-ib-theme-sample[data-theme="frost"] b { grid-column: 2; grid-row: 1 / 4; text-align: right; font-size: 22px; font-weight: 300; }
 @media (prefers-reduced-motion: reduce) {

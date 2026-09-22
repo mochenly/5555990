@@ -31,6 +31,7 @@ import { menuHtml, popupHtml } from './modules/template.js';
 import { applyCalendarUpdates, dateFromIso, formatCalendarDate, renderCalendar, syncCalendarDate } from './modules/calendar.js';
 import { fetchModels, parseJsonResponse, requestModel } from './modules/model-api.js';
 import { applyGalleryUpdates, applyHealthUpdate, applyRelationshipUpdate, applySecretsUpdate, applyWorldUpdate, createState, getState, normalizeState, reconcileStateWithChat, storeSnapshot } from './modules/state.js';
+import { arcMessageText, normalizeRecap, recapMarkdown, resolvedThreadIndices } from './modules/arc-summary.js';
 import { createRenderer } from './modules/renderer.js';
 import { createGalleryImages } from './modules/gallery-images.js';
 import { createSectionEditor } from './modules/editor.js';
@@ -39,7 +40,7 @@ import { createFocusController } from './modules/focus.js';
 import { createGallerySettings } from './modules/gallery-settings.js';
 import { initializeGallerySettings } from './modules/gallery-data.js';
 import { candidateIndices, participantContext, prepareRebuiltChat, validateManualArcs, wholeChatIndices } from './modules/analysis.js';
-import { applySceneToState, buildInfoblock, hasSceneTag, infoblockInstruction, lastCharacterMessageIndex, parseSceneTag, readStoredScene, removeInfoblocks, renderInfoblock, sceneTagSource, storeScene, stripSceneTagFromMessage } from './modules/infoblock.js';
+import { applySceneToState, buildInfoblock, hasSceneTag, infoblockInstruction, lastCharacterMessageIndex, parseSceneTag, readStoredScene, removeInfoblocks, renderInfoblock, sceneTagSource, setTrailFocus, storeScene, stripSceneTagFromMessage } from './modules/infoblock.js';
 // ВРЕМЕННО: предпросмотр заполненного интерфейса, удалить вместе с demo.js.
 import { fillDemoState } from './modules/demo.js';
 
@@ -107,6 +108,13 @@ function saveSettings() {
     settings.interval = Math.max(1, Math.min(100, Number(settings.interval) || DEFAULT_SETTINGS.interval));
     settings.arcMaxMessages = Math.max(0, Math.min(500, Math.round(Number(settings.arcMaxMessages) || 0)));
     settings.arcMaxTokens = Math.max(0, Math.min(200000, Math.round(Number(settings.arcMaxTokens) || 0)));
+    settings.arcVisibleBuffer = Math.max(0, Math.min(200, Math.round(Number(settings.arcVisibleBuffer) || 0)));
+    // Ноль читаем как «без предела»: иначе опечатка в поле молча слила бы все
+    // арки истории в одну.
+    // Ноль здесь — осмысленное значение («без предела»), поэтому `|| default`
+    // не годится: он проглотил бы его вместе с мусором. Отличаем одно от другого.
+    const arcLimit = Math.round(Number(settings.arcLimit));
+    settings.arcLimit = Math.max(0, Math.min(50, Number.isFinite(arcLimit) ? arcLimit : DEFAULT_SETTINGS.arcLimit));
     settings.secretLimits = Object.fromEntries(SECRET_OWNERS.map(owner => [owner, secretLimit(settings, owner)]));
     saveSettingsDebounced();
     updateArcInjection();
@@ -211,6 +219,8 @@ function syncSettingsUi() {
     $('#mnema_interval').val(settings.interval);
     $('#mnema_arc_max_messages').val(settings.arcMaxMessages || '');
     $('#mnema_arc_max_tokens').val(settings.arcMaxTokens || '');
+    $('#mnema_arc_visible_buffer').val(settings.arcVisibleBuffer || '');
+    $('#mnema_arc_limit').val(settings.arcLimit || '');
     $('#mnema_connection_mode').val(settings.connectionMode);
     $('#mnema_api_url').val(settings.apiUrl);
     $('#mnema_api_key').val(settings.apiKey);
@@ -259,7 +269,9 @@ function syncFocusButtons() {
             && (busy.kind !== 'secrets' || busy.owner === this.dataset.focusOwner);
         this.disabled = disabled;
         this.setAttribute('aria-busy', String(active));
-        $(this).find('i').attr('class', active ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-wand-magic-sparkles');
+        // Иконку покоя берём с самой кнопки: у кнопок фокуса они разные, и
+        // возвращать всем палочку значит стереть чужую после первой же генерации.
+        $(this).find('i').attr('class', active ? 'fa-solid fa-spinner fa-spin' : (this.dataset.focusIcon || 'fa-solid fa-wand-magic-sparkles'));
     });
 }
 
@@ -298,7 +310,7 @@ function createArcMessage(arc) {
         name: 'Mnema',
         is_user: false,
         is_system: arc.active === false,
-        mes: `### ${t('Конспект арки: {title}', { title: arc.title })}\n\n${arc.summary}`,
+        mes: arcMessageText(arc),
         send_date: new Date().toISOString(),
         extra: {
             type: system_message_types.NARRATOR,
@@ -334,7 +346,7 @@ function arcFoldLabel(arc, count, unfolded) {
 
 // Исходные сообщения арки остаются в чате (на них живут снимки состояния и по
 // ним идёт пересчёт всего чата), но в ленте их заменяет одна полоска.
-function foldArcSources(chatElement, messageElements, state) {
+function foldArcSources(chatElement, messageElements, state, chat = []) {
     const byIndex = new Map(messageElements.map(element => [Number(element.getAttribute('mesid')), element]));
     const unfoldedArcs = new Set([...chatElement.querySelectorAll('.mnema-arc-fold.open')].map(node => node.dataset.arcId));
     chatElement.querySelectorAll('.mnema-arc-fold').forEach(node => node.remove());
@@ -342,7 +354,10 @@ function foldArcSources(chatElement, messageElements, state) {
         // Выключенная арка снова отдаёт исходники модели — прятать их в этот
         // момент значило бы показывать не то, что уходит в промпт.
         if (arc.active === false) continue;
-        const elements = (arc.messageIndices || []).map(index => byIndex.get(index)).filter(Boolean);
+        // По той же причине не сворачиваем хвост, оставленный буфером видимости:
+        // эти сообщения не скрыты и идут в промпт целиком.
+        const elements = (arc.messageIndices || []).filter(index => chat[index]?.is_system !== false)
+            .map(index => byIndex.get(index)).filter(Boolean);
         if (!elements.length) continue;
         const unfolded = unfoldedArcs.has(arc.id);
         for (const element of elements) {
@@ -375,7 +390,7 @@ function decorateArcMessages() {
         element.classList.remove('mnema-arc-source', 'mnema-arc-unfolded');
         delete element.dataset.mnemaFold;
     }
-    foldArcSources(chatElement, messageElements, getState({ create: false }));
+    foldArcSources(chatElement, messageElements, getState({ create: false }), chat);
 }
 
 async function migrateArcMessages(chat, state) {
@@ -506,37 +521,189 @@ async function setMessagesHidden(chat, indices, hidden) {
     await getContext().saveChat();
 }
 
-async function requestArcSummary(noteSummaries, fallbackTitle) {
-    const messages = buildArcPrompt(noteSummaries, participantContext(getContext() || {}));
+// Открытые линии всех действующих арок одним плоским списком: модель отвечает
+// номерами по нему, а мы по тем же номерам знаем, из какой арки вырезать.
+function collectOpenThreads(state) {
+    return (state?.arcs || []).filter(arc => arc.active !== false)
+        .flatMap(arc => (arc.recap?.threads || []).map(text => ({ arcId: arc.id, text })));
+}
+
+async function requestArcSummary(noteSummaries, fallbackTitle, openThreads = []) {
+    const messages = buildArcPrompt(noteSummaries, participantContext(getContext() || {}), openThreads.map(thread => thread.text));
     const result = parseJsonResponse(await requestModel(messages, settings, 2400));
     const summary = String(result.summary || '').trim();
     if (!summary) throw new Error('В ответе модели отсутствует summary');
-    return { title: String(result.title || fallbackTitle).trim(), summary };
+    return {
+        title: String(result.title || fallbackTitle).trim(),
+        summary,
+        recap: normalizeRecap(result.recap),
+        resolved: resolvedThreadIndices(result.resolved_threads, openThreads.map(thread => thread.text)),
+    };
 }
 
-function createArc({ title, summary, indices, notes }) {
+// Линии, закрытые новой аркой, вырезаем из перечней прошлых: держать в памяти
+// «долг не отдан» после того, как его отдали, — хуже, чем не держать ничего.
+async function pruneResolvedThreads(chat, state, openThreads, resolved) {
+    const byArc = new Map();
+    for (const position of resolved) {
+        const thread = openThreads[position];
+        if (!thread) continue;
+        if (!byArc.has(thread.arcId)) byArc.set(thread.arcId, new Set());
+        byArc.get(thread.arcId).add(thread.text);
+    }
+    let changed = 0;
+    for (const [arcId, texts] of byArc) {
+        const arc = state.arcs.find(item => item.id === arcId);
+        if (!arc?.recap?.threads?.length) continue;
+        const kept = arc.recap.threads.filter(text => !texts.has(text));
+        const removed = arc.recap.threads.length - kept.length;
+        if (!removed) continue;
+        // Пустой список убираем целиком: иначе в сводке останется заголовок
+        // «Осталось открытым» без единой строки под ним.
+        if (kept.length) arc.recap.threads = kept;
+        else delete arc.recap.threads;
+        const index = findArcMessageIndex(chat, arc);
+        if (index !== null) chat[index].mes = arcMessageText(arc);
+        changed += removed;
+    }
+    return changed;
+}
+
+function createArc({ title, summary, recap = {}, indices, notes }) {
     return {
         id: `arc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        title, summary,
+        title, summary, recap,
         range: [indices[0], indices[indices.length - 1]], messageIndices: indices,
         eventNotes: notes.map(note => ({ ...note })), active: true, createdAt: new Date().toISOString(),
     };
 }
 
+
+// Пересборка сводки по кнопке: исходные конспекты интервалов лежат в самой арке,
+// поэтому перечитывать чат и тратить анализ заново не нужно. Меняется только
+// текст — границы арки, её сообщения и снимки состояния остаются как были.
+async function regenerateArc(arcId) {
+    if (processing || focus.status().busy) return notify('Дождитесь окончания текущей операции', 'info');
+    const chat = getContext()?.chat;
+    const state = getState({ create: false });
+    const arc = state?.arcs?.find(item => item.id === arcId);
+    if (!arc || !Array.isArray(chat)) return;
+    const notes = (arc.eventNotes || []).map(note => note.summary).filter(Boolean);
+    if (!notes.length) return notify('У этой арки не сохранены конспекты интервалов', 'info');
+
+    const epoch = chatEpoch;
+    processing = true;
+    renderOverview();
+    syncFocusButtons();
+    try {
+        const { title, summary, recap } = await requestArcSummary(notes, arc.title);
+        if (epoch !== chatEpoch || getContext()?.chat !== chat) throw new Error('Чат сменился во время пересборки арки');
+        // Арку ищем заново: за время запроса состояние могло смениться, и писать
+        // в захваченный объект значило бы потерять правку или воскресить удалённое.
+        const target = getState({ create: false })?.arcs?.find(item => item.id === arcId);
+        if (!target) throw new Error('Арка исчезла во время пересборки');
+        Object.assign(target, { title, summary, recap });
+        const index = findArcMessageIndex(chat, target);
+        if (index !== null) chat[index].mes = createArcMessage(target).mes;
+        await getContext().saveChat();
+        updateArcInjection();
+        notify(t('Сводка арки «{title}» пересобрана', { title: target.title }), 'success');
+    } catch (error) {
+        notify(error.message || String(error), 'error');
+    } finally {
+        processing = false;
+        renderOverview();
+        syncFocusButtons();
+        await reloadCurrentChat();
+    }
+}
+
+// Хвост чата, который остаётся видимым даже будучи заархивированным: сводка
+// пересказывает события, но не сохраняет голос сцены, и без нескольких живых
+// реплик перед носом модель на стыке арок сбивается на пересказ.
+//
+// Пересчитываем по всем аркам сразу, а не по свежезакрытой: сообщения, попавшие
+// в буфер прошлый раз, к этому моменту уже уехали вглубь и должны скрыться.
+async function applyArcVisibility(chat, state) {
+    const archived = state.arcs.filter(arc => arc.active !== false).flatMap(arc => arc.messageIndices || []);
+    if (!archived.length) return;
+    const buffer = Math.max(0, Number(settings.arcVisibleBuffer) || 0);
+    const keep = new Set();
+    // Считаем от конца по настоящим репликам: вставленные сводки арок видимы и
+    // так, и занимать ими места в буфере значило бы урезать его молча.
+    for (let index = chat.length - 1, left = buffer; index >= 0 && left > 0; index--) {
+        if (!chat[index] || chat[index].extra?.mnema_arc_id) continue;
+        keep.add(index);
+        left--;
+    }
+    const hide = archived.filter(index => !keep.has(index));
+    const show = archived.filter(index => keep.has(index));
+    if (hide.length) await setMessagesHidden(chat, hide, true);
+    if (show.length) await setMessagesHidden(chat, show, false);
+}
+
+// Число отдельных арок ограничено: на длинной истории десяток сводок в контексте
+// работает хуже одной общей. При переполнении самые старые сливаются в большое
+// саммари — история не теряется, но перестаёт расти вширь.
+async function consolidateArcs(chat, state, epoch) {
+    const limit = Math.max(0, Number(settings.arcLimit) || 0);
+    if (!limit || state.arcs.length <= limit) return null;
+    // Сливаем ровно столько старых, чтобы уложиться в лимит, но не меньше двух:
+    // «слияние» одной арки лишь переписало бы ей заголовок чужой моделью.
+    const mergeCount = Math.max(2, state.arcs.length - limit + 1);
+    if (mergeCount > state.arcs.length) return null;
+    const merged = state.arcs.slice(0, mergeCount);
+    // В слияние отдаём сводки вместе с их перечнями: именно там живут
+    // открытые линии и детали, которые иначе потерялись бы при пересказе пересказа.
+    const { title, summary, recap } = await requestArcSummary(
+        merged.map(arc => [arc.summary, recapMarkdown(arc.recap)].filter(Boolean).join('\n\n')), t('Ранняя история'));
+    if (epoch !== chatEpoch || getContext()?.chat !== chat) throw new Error('Чат сменился во время слияния арок');
+
+    // Сводки сливаемых арок убираем с конца: удаление с головы сдвинуло бы
+    // номера ещё не обработанных.
+    for (const arc of [...merged].reverse()) {
+        const index = findArcMessageIndex(chat, arc);
+        if (index === null) continue;
+        chat.splice(index, 1);
+        // Сдвигаем то, что строго дальше: ссылки на саму удалённую строку
+        // принадлежат сливаемой арке и уходят вместе с ней.
+        shiftStateIndices(state, index + 1, -1);
+    }
+    const indices = [...new Set(merged.flatMap(arc => arc.messageIndices || []))].filter(index => chat[index]).sort((a, b) => a - b);
+    if (!indices.length) return null;
+    const combined = createArc({ title, summary, recap, indices, notes: merged.flatMap(arc => arc.eventNotes || []) });
+    state.arcs.splice(0, mergeCount, combined);
+    insertArcMessage(chat, state, combined, arcInsertPosition(indices));
+    await getContext().saveChat();
+    return { arc: combined, mergeCount };
+}
+
 async function finalizeArc(chat, state, epoch, { reload = true, silent = false } = {}) {
     const indices = [...state.pending.messageIndices].filter(index => chat[index]);
     if (!indices.length || !state.pending.eventNotes.length) { state.pending.closeRequested = false; return null; }
-    const { title, summary } = await requestArcSummary(state.pending.eventNotes.map(note => note.summary), t('Арка {n}', { n: state.arcs.length + 1 }));
+    const openThreads = collectOpenThreads(state);
+    const { title, summary, recap, resolved } = await requestArcSummary(
+        state.pending.eventNotes.map(note => note.summary), t('Арка {n}', { n: state.arcs.length + 1 }), openThreads);
     if (epoch !== chatEpoch || getContext()?.chat !== chat) throw new Error('Чат сменился во время формирования арки');
-    const arc = createArc({ title, summary, indices, notes: state.pending.eventNotes });
+    const arc = createArc({ title, summary, recap, indices, notes: state.pending.eventNotes });
+    // Чистим до вставки новой сводки: она сдвигает номера, а чистке нужно найти
+    // сообщения прошлых арок по их текущим местам.
+    const pruned = await pruneResolvedThreads(chat, state, openThreads, resolved);
     state.arcs.push(arc);
     insertArcMessage(chat, state, arc, arcInsertPosition(indices));
     state.pending = { messageIndices: [], eventNotes: [], closeRequested: false };
     await getContext().saveChat();
-    await setMessagesHidden(chat, arc.messageIndices, true);
+    // Слияние идёт до расчёта видимости: оно двигает номера сообщений, и
+    // скрывать по старым значило бы промахнуться мимо цели.
+    const consolidated = await consolidateArcs(chat, state, epoch);
+    await applyArcVisibility(chat, state);
     updateArcInjection();
     if (reload) await reloadCurrentChat();
-    if (!silent) notify(t('Арка «{title}» завершена', { title: arc.title }), 'success');
+    if (!silent) {
+        notify(t('Арка «{title}» завершена', { title: arc.title }), 'success');
+        if (pruned) notify(t('Закрыто открытых линий в прошлых арках: {n}', { n: pruned }), 'info');
+        if (consolidated) notify(t('Старые арки слиты в одну: {n}', { n: consolidated.mergeCount }), 'info');
+    }
     return arc;
 }
 
@@ -1010,7 +1177,12 @@ function bindEvents() {
         void getContext().saveChat();
         renderCalendar(state);
     });
+    // Кнопки живут в <summary>, поэтому клик по ним иначе ещё и переключал бы
+    // саму арку. Гасим только действие по умолчанию — остальные обработчики
+    // отработать обязаны.
+    $(document).on('click', '.mnema-arc > summary button', function (event) { event.preventDefault(); });
     $(document).on('click', '.mnema-arc-toggle', function () { void toggleArc(this.closest('.mnema-arc')?.dataset.arcId); });
+    $(document).on('click', '[data-mnema-arc-regenerate]', function () { void regenerateArc(this.dataset.mnemaArcRegenerate); });
     $(document).on('click', '.mnema-arc-fold', function () {
         const arcId = this.dataset.arcId;
         if (!arcId) return;
@@ -1029,6 +1201,8 @@ function bindEvents() {
     $(document).on('change', '#mnema_interval', function () { settings.interval = this.value; saveSettings(); syncSettingsUi(); renderOverview(); });
     $(document).on('change', '#mnema_arc_max_messages', function () { settings.arcMaxMessages = this.value; saveSettings(); syncSettingsUi(); });
     $(document).on('change', '#mnema_arc_max_tokens', function () { settings.arcMaxTokens = this.value; saveSettings(); syncSettingsUi(); });
+    $(document).on('change', '#mnema_arc_visible_buffer', function () { settings.arcVisibleBuffer = this.value; saveSettings(); syncSettingsUi(); });
+    $(document).on('change', '#mnema_arc_limit', function () { settings.arcLimit = this.value; saveSettings(); syncSettingsUi(); });
     $(document).on('change', '#mnema_connection_mode', function () { settings.connectionMode = this.value === 'manual' ? 'manual' : 'profile'; saveSettings(); syncSettingsUi(); });
     $(document).on('change', '#mnema_profile', function () { settings.profileId = this.value; saveSettings(); });
     $(document).on('change', '#mnema_api_url', function () { settings.apiUrl = this.value.trim(); saveSettings(); syncManualModels(); });
@@ -1058,6 +1232,15 @@ function bindEvents() {
     });
     $(document).on('click', '[data-mnema-focus]', function () {
         void focus.generate(this.dataset.mnemaFocus, SECRET_OWNERS.includes(this.dataset.focusOwner) ? this.dataset.focusOwner : 'char');
+    });
+    // Листание ступеней меняет только показанную карточку, поэтому плашку не
+    // перерисовываем: перерисовка сбросила бы выбор обратно на текущую ступень.
+    $(document).on('click', '[data-trail-dot], [data-trail-nav]', function () {
+        const trail = this.closest('.mnema-ib-trail');
+        if (!trail) return;
+        setTrailFocus(trail, this.dataset.trailDot !== undefined
+            ? Number(this.dataset.trailDot)
+            : Number(trail.dataset.trailFocus) + Number(this.dataset.trailNav));
     });
     $(document).on('click', '.mnema-ib-action', async function () {
         const action = this.dataset.mnemaIb;

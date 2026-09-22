@@ -1,5 +1,6 @@
 import { escapeHtml, isNativeSystemMessage } from './utils.js';
 import { isRussianUi, t } from './i18n.js';
+import { isWorldPlan, planKind } from './config.js';
 
 const MONTHS = new Map([
     ['январь', 1], ['января', 1], ['янв', 1], ['january', 1], ['jan', 1],
@@ -158,7 +159,7 @@ export function applyCalendarUpdates(state, updates, enabled = true, messageInde
         const existing = state.calendar.plans.findIndex(entry => entry.title.toLowerCase() === title.toLowerCase());
         const previous = existing >= 0 ? state.calendar.plans[existing] : {};
         const date = item.date ? parseCalendarDate(item.date, anchor, { preferFuture: true }) : null;
-        const plan = { id: item.id || `plan_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, title, date: isoDate(date) || previous.date || null, time: String(item.time || previous.time || '').trim(), details: String(item.details || item.note || previous.details || '').trim() };
+        const plan = { id: item.id || `plan_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, title, date: isoDate(date) || previous.date || null, time: String(item.time || previous.time || '').trim(), details: String(item.details || item.note || previous.details || '').trim(), kind: planKind(item.kind ?? previous.kind) };
         if (existing >= 0) state.calendar.plans[existing] = { ...state.calendar.plans[existing], ...plan, id: state.calendar.plans[existing].id };
         else state.calendar.plans.push(plan);
     }
@@ -198,7 +199,6 @@ export function renderCalendar(state) {
 
     $('#mnema_calendar_badge').text(upcomingPlans.length).prop('hidden', upcomingPlans.length === 0);
     $('#mnema_birthday_count').text(birthdays.length);
-    $('#mnema_plan_count').text(upcomingPlans.length);
     $('#mnema_calendar_anchor').text(anchor
         ? t('Сюжетная дата · сообщение #{n}', { n: calendar.sourceMessageIndex })
         : t('Ищу дату в диалоге'));
@@ -239,8 +239,18 @@ export function renderCalendar(state) {
         return `<article class="mnema-birthday-item"><span class="mnema-calendar-item-icon"><i class="fa-solid fa-cake-candles"></i></span><div><strong>${escapeHtml(item.person)}</strong>${item.note ? `<small>${escapeHtml(item.note)}</small>` : ''}</div><time>${formatCalendarDate(next)}</time>${daysAway !== null && daysAway <= 30 ? '<em>скоро</em>' : ''}</article>`;
     }).join('') : '<div class="mnema-calendar-empty">Дни рождения пока не найдены.</div>');
 
-    $('#mnema_plans').html(upcomingPlans.length ? upcomingPlans.slice(0, 10).map(plan => {
+    // Два списка вместо одного: обязательство героев и то, что мир делает сам,
+    // читаются по-разному, и сваленные вместе они путают не только модель.
+    const planItem = plan => {
         const date = dateFromIso(plan.date);
         return `<article class="mnema-plan-item"><span class="mnema-plan-bar"></span><div><strong>${escapeHtml(plan.title)}</strong>${plan.details || plan.time ? `<small>${escapeHtml([plan.time, plan.details].filter(Boolean).join(' · '))}</small>` : ''}</div><time>${formatCalendarDate(date, date?.getFullYear() !== anchor?.getFullYear())}</time></article>`;
-    }).join('') : '<div class="mnema-calendar-empty">Ближайших планов пока нет.</div>');
+    };
+    const personal = upcomingPlans.filter(plan => !isWorldPlan(plan));
+    const world = upcomingPlans.filter(isWorldPlan);
+    $('#mnema_plan_count').text(personal.length);
+    $('#mnema_world_plan_count').text(world.length);
+    $('#mnema_plans').html(personal.length ? personal.slice(0, 10).map(planItem).join('')
+        : '<div class="mnema-calendar-empty">Личных планов пока нет.</div>');
+    $('#mnema_world_plans').html(world.length ? world.slice(0, 10).map(planItem).join('')
+        : '<div class="mnema-calendar-empty">Событий мира пока нет.</div>');
 }

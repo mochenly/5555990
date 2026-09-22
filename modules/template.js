@@ -193,8 +193,14 @@ export function popupHtml() {
                                     <div id="mnema_birthdays" class="mnema-calendar-items"></div>
                                 </section>
                                 <section class="mnema-calendar-list-block">
-                                    <div class="mnema-calendar-list-title"><span><i class="fa-solid fa-clock"></i> Ближайшие планы</span><span><b id="mnema_plan_count">0</b><button type="button" class="mnema-section-edit" data-mnema-focus="plans" title="Придумать поводы пересечься" aria-label="Придумать поводы пересечься"><i class="fa-solid fa-wand-magic-sparkles"></i></button></span></div>
+                                    <div class="mnema-calendar-list-title"><span><i class="fa-solid fa-clock"></i> Личные планы</span><span><b id="mnema_plan_count">0</b><button type="button" class="mnema-section-edit" data-mnema-focus="plans" title="Придумать поводы пересечься" aria-label="Придумать поводы пересечься"><i class="fa-solid fa-wand-magic-sparkles"></i></button></span></div>
+                                    <p class="mnema-calendar-hint">Обещания и договорённости героев. Их можно сдержать, перенести или нарушить.</p>
                                     <div id="mnema_plans" class="mnema-calendar-items"></div>
+                                </section>
+                                <section class="mnema-calendar-list-block">
+                                    <div class="mnema-calendar-list-title"><span><i class="fa-solid fa-earth-americas"></i> События мира</span><span><b id="mnema_world_plan_count">0</b><button type="button" class="mnema-section-edit" data-mnema-focus="events" data-focus-icon="fa-solid fa-earth-americas" title="Придумать события сеттинга" aria-label="Придумать события сеттинга"><i class="fa-solid fa-earth-americas"></i></button></span></div>
+                                    <p class="mnema-calendar-hint">Происходит само по себе, без участия героев. В промпт уходит только ближайшая дата — остальное ждёт своей очереди.</p>
+                                    <div id="mnema_world_plans" class="mnema-calendar-items"></div>
                                 </section>
                             </div>
                         </section>
@@ -264,6 +270,8 @@ export function popupHtml() {
                                     <label class="mnema-field">Проверять каждые N сообщений<input id="mnema_interval" class="text_pole" type="number" min="1" max="100"></label>
                                     <label class="mnema-field">Максимум сообщений в арке<input id="mnema_arc_max_messages" class="text_pole" type="number" min="0" max="500" placeholder="0 — без предела"></label>
                                     <label class="mnema-field">Максимум токенов в арке<input id="mnema_arc_max_tokens" class="text_pole" type="number" min="0" max="200000" step="500" placeholder="0 — без предела"></label>
+                                    <label class="mnema-field">Не скрывать последние сообщения<input id="mnema_arc_visible_buffer" class="text_pole" type="number" min="0" max="200" placeholder="0 — скрывать всю арку"><small>Хвост чата остаётся видимым даже после закрытия арки, чтобы модель не теряла нить</small></label>
+                                    <label class="mnema-field">Максимум отдельных арок<input id="mnema_arc_limit" class="text_pole" type="number" min="0" max="50" placeholder="0 — без предела"><small>Когда арок становится больше, самые старые сливаются в одно большое саммари</small></label>
                                 </div>
                                 <p class="mnema-hint">Обычно арку закрывает модель, когда сюжет пришёл к развязке. Лимиты — страховка от бесконечной арки: как только накопленные сообщения превышают предел, Mnema закрывает её сама на ближайшем анализе. 0 отключает ограничение.</p>
                                 <label class="mnema-check mnema-glass-card"><input id="mnema_infoblock" type="checkbox"> <span><strong>Режим «инфоблок»</strong><small>Основная модель дописывает метку сцены, Mnema превращает её в плашку под сообщением и вырезает метку из контекста</small></span></label>

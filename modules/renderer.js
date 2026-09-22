@@ -5,7 +5,29 @@ import { dateFromIso, formatCalendarDate, renderCalendar } from './calendar.js';
 import { normalizeRelationship } from './state.js';
 import { escapeHtml } from './utils.js';
 import { t } from './i18n.js';
+import { RECAP_KEYS, RECAP_LABELS } from './arc-summary.js';
 import { galleryEnabled } from './gallery-data.js';
+
+
+// Сводка приходит абзацами через пустую строку — в одном <p> они схлопнулись бы
+// в ту самую стену текста, ради разбиения которой промпт и переписывался.
+function arcSummaryHtml(summary) {
+    return String(summary || '').split(/\n{2,}/).map(part => part.trim()).filter(Boolean)
+        .map(part => `<p>${escapeHtml(part)}</p>`).join('');
+}
+
+// Свёрнутая арка должна оставаться узнаваемой, иначе список превращается в
+// столбик одинаковых заголовков. Хватает первой фразы.
+function arcPreview(summary) {
+    const text = String(summary || '').replace(/\s+/g, ' ').trim();
+    return text.length > 150 ? text.slice(0, 149).replace(/\s+\S*$/, '') + '…' : text;
+}
+
+function arcRecapHtml(recap) {
+    const blocks = RECAP_KEYS.filter(key => recap?.[key]?.length).map(key => `
+        <div class="mnema-arc-recap-block"><h6>${t(RECAP_LABELS[key])}</h6><ul>${recap[key].map(line => `<li>${escapeHtml(line)}</li>`).join('')}</ul></div>`);
+    return blocks.length ? `<div class="mnema-arc-recap">${blocks.join('')}</div>` : '';
+}
 
 export function createRenderer({ getState, getSettings, isProcessing, candidateIndices, getGalleryImageConfig, getGalleryStatus = () => ({ expanded: new Set() }) }) {
     const settings = new Proxy({}, { get: (_target, property) => getSettings()?.[property] });
@@ -28,14 +50,23 @@ export function createRenderer({ getState, getSettings, isProcessing, candidateI
     
         const arcs = state?.arcs || [];
         $('#mnema_arc_count').text(String(arcs.length));
+        // Раскрытые арки запоминаем по самому DOM, а не по отдельному состоянию:
+        // список перерисовывается на каждое обновление, и без этого любая правка
+        // захлопывала бы арку прямо под курсором.
+        const expandedArcs = new Set([...document.querySelectorAll('#mnema_arcs details.mnema-arc[open]')].map(node => node.dataset.arcId));
         $('#mnema_arcs').html(arcs.length ? [...arcs].reverse().map(arc => `
-            <article class="mnema-arc ${arc.active === false ? 'inactive' : ''}" data-arc-id="${escapeHtml(arc.id)}">
-                <div class="mnema-arc-head"><div><small>#${arc.range?.[0]}–#${arc.range?.[1]}</small><h5>${escapeHtml(arc.title)}</h5></div>
-                    <button type="button" class="mnema-section-edit" data-mnema-edit="arcs" data-edit-id="${escapeHtml(arc.id)}" title="Редактировать арку" aria-label="Редактировать арку"><i class="fa-solid fa-pen"></i></button>
-                    <button class="mnema-arc-toggle" type="button" title="${arc.active === false ? 'Скрыть исходные сообщения и вернуть сводку' : 'Вернуть исходные сообщения'}"><i class="fa-solid ${arc.active === false ? 'fa-box-archive' : 'fa-eye'}"></i></button>
-                </div>
-                <p>${escapeHtml(arc.summary)}</p><small>${t('{n} сообщений · {m} событий', { n: arc.messageIndices?.length || 0, m: arc.eventNotes?.length || 0 })}</small>
-            </article>`).join('') : '<p class="mnema-empty">Завершённых арок пока нет.</p>');
+            <details class="mnema-arc ${arc.active === false ? 'inactive' : ''}" data-arc-id="${escapeHtml(arc.id)}"${expandedArcs.has(arc.id) ? ' open' : ''}>
+                <summary>
+                    <div class="mnema-arc-head"><div><small>#${arc.range?.[0]}–#${arc.range?.[1]}</small><h5>${escapeHtml(arc.title)}</h5></div>
+                        <button type="button" class="mnema-section-edit" data-mnema-arc-regenerate="${escapeHtml(arc.id)}" title="Пересобрать сводку арки" aria-label="Пересобрать сводку арки"${arc.eventNotes?.length ? '' : ' disabled'}><i class="fa-solid fa-rotate"></i></button>
+                        <button type="button" class="mnema-section-edit" data-mnema-edit="arcs" data-edit-id="${escapeHtml(arc.id)}" title="Редактировать арку" aria-label="Редактировать арку"><i class="fa-solid fa-pen"></i></button>
+                        <button class="mnema-arc-toggle" type="button" title="${arc.active === false ? 'Скрыть исходные сообщения и вернуть сводку' : 'Вернуть исходные сообщения'}"><i class="fa-solid ${arc.active === false ? 'fa-box-archive' : 'fa-eye'}"></i></button>
+                        <i class="fa-solid fa-chevron-down mnema-arc-chevron" aria-hidden="true"></i>
+                    </div>
+                    <p class="mnema-arc-preview">${escapeHtml(arcPreview(arc.summary))}</p>
+                </summary>
+                <div class="mnema-arc-body">${arcSummaryHtml(arc.summary)}${arcRecapHtml(arc.recap)}<small>${t('{n} сообщений · {m} событий', { n: arc.messageIndices?.length || 0, m: arc.eventNotes?.length || 0 })}</small></div>
+            </details>`).join('') : '<p class="mnema-empty">Завершённых арок пока нет.</p>');
     
         const unprocessed = state ? candidateIndices(chat, state).length : 0;
         $('#mnema_pending_badge').text(notes.length).prop('hidden', notes.length === 0);
