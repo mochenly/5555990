@@ -2,7 +2,7 @@ import { SECRET_OWNERS, secretLimit, secretCount, sameSecret } from './secrets.j
 import { getContext } from '/scripts/extensions.js';
 import { arcMessageText } from './arc-summary.js';
 import { normalizeState } from './state.js';
-import { escapeHtml, notify } from './utils.js';
+import { escapeHtml, notify, resolveSurfaceColor } from './utils.js';
 
 const field = (key, label, type = 'text', options = null) => ({ key, label, type, options });
 const SECTIONS = {
@@ -174,6 +174,11 @@ export function createSectionEditor({ getSettings, getState, isBusy, onSaved }) 
         close();
         session = { state, context: getContext() };
         dialog = document.createElement('dialog'); dialog.id = 'mnema_section_editor';
+        // Диалог живёт в body, а не внутри окна Мнемы, поэтому сплошной фон
+        // считает себе сам: править текст сквозь просвечивающий чат тяжелее
+        // всего, а редактор открывается и из плашки под сообщением, когда окно
+        // Мнемы даже не открывали.
+        dialog.style.setProperty('--mnema-surface', resolveSurfaceColor(getComputedStyle(document.body)));
         document.body.append(dialog);
         select(SECTIONS[section] ? section : 'world', target);
         dialog.addEventListener('submit', save);

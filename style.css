@@ -17,8 +17,15 @@ body.mnema-popup-open { overflow: hidden; }
     place-items: center;
     padding: 20px;
     color: var(--mnema-text);
-    background: color-mix(in srgb, var(--SmartThemeShadowColor, #000) 70%, transparent);
-    backdrop-filter: blur(8px);
+    /* Затемнение вокруг окна цвету темы больше не доверяет. Оно бралось из
+       --SmartThemeShadowColor, а тень темы — это rgba со своей альфой: у 26 тем
+       из 64 затемнение выходило слабее половины, у восьми его не было совсем, и
+       чат оставался читаемым прямо за окном. Плюс тень бывает белой, и тогда
+       «затемнение» ложилось белёсой дымкой. Скрим модального окна — служебная
+       поверхность, а не часть оформления, поэтому цвет здесь свой и постоянный:
+       так чат гарантированно уходит на задний план в любой теме. */
+    background: rgba(9, 8, 12, 0.82);
+    backdrop-filter: blur(10px);
 }
 
 .mnema-popup[hidden],
@@ -1550,8 +1557,10 @@ html body #chat .mnema-arc-fold {
 
 /* Matrix-style gallery: compact covers, expanded personal recollections. */
 .mnema-section-edit { margin-left: auto; border: 0; background: transparent; color: inherit; cursor: pointer; padding: 6px 10px; font-size: 13px; }
-#mnema_section_editor { width: min(680px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 22px; border: 1px solid var(--SmartThemeBorderColor, #777); border-radius: 16px; background: var(--SmartThemeBlurTintColor, #24212b); color: var(--SmartThemeBodyColor, #eee); box-shadow: 0 16px 70px #0008; }
-#mnema_section_editor::backdrop { background: #0009; backdrop-filter: blur(5px); }
+#mnema_section_editor { width: min(680px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 22px; border: 1px solid var(--SmartThemeBorderColor, #777); border-radius: 16px; background: var(--mnema-surface, var(--SmartThemeBlurTintColor, #24212b)); color: var(--SmartThemeBodyColor, #eee); box-shadow: 0 16px 70px #0008; }
+/* Те же значения, что и у затемнения окна: редактор открывается и поверх Мнемы,
+   и прямо из плашки под сообщением, когда за ним один голый чат. */
+#mnema_section_editor::backdrop { background: rgba(9, 8, 12, 0.82); backdrop-filter: blur(10px); }
 #mnema_section_editor header, #mnema_section_editor footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 #mnema_section_editor header h3 { margin: 0; }
 #mnema_section_editor header button { border: 0; background: transparent; color: inherit; font-size: 26px; cursor: pointer; }
