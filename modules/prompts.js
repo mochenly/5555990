@@ -1,7 +1,7 @@
 import { secretRules } from './secrets.js';
 import { galleryEnabled } from './gallery-data.js';
 import { isWorldPlan, RELATIONSHIP_LADDER_LIMIT } from './config.js';
-import { dispositionBand, PROMPT_BANDS } from './disposition.js';
+import { promptDisposition } from './disposition.js';
 
 export const rungTitle = relationship => (relationship?.ladder || []).find(rung => rung.id === relationship?.phase)?.title || '';
 
@@ -412,32 +412,21 @@ function conditionLine(health) {
     return parts.length ? `${CHAR} now: ${parts.join('; ')}` : '';
 }
 
-// Направление важнее уровня: доверие, которое только что просело, ведёт себя
-// иначе, чем то же доверие, стоявшее там всегда. Знак уже посчитан анализом.
-const TRENDS = { 1: 'recently rose', '-1': 'recently dropped' };
-
 function relationshipDisposition(relationship, trends = {}) {
-    const lines = Object.entries(PROMPT_BANDS)
-        // Ноль — это «ещё не оценено», а не «нет доверия»: пустой раздел не
-        // должен отыгрываться как холод между героями.
-        .filter(([metric]) => Number(relationship[metric]) > 0)
-        .map(([metric, bands]) => {
-            const move = TRENDS[String(Math.sign(Number(trends?.[metric]) || 0))];
-            return `- ${metric}: ${CHAR} ${bands[dispositionBand(Number(relationship[metric]))]}${move ? `; it ${move}` : ''}.`;
-        });
-    if (!lines.length) return [];
-    // Одна и та же цифра в разных историях означает разное: доверие 58 у тех,
-    // кто прошёл через вынужденный союз и чужой город, — не то же доверие, что у
+    const stance = promptDisposition(relationship, trends);
+    if (!stance) return [];
+    // Одна и та же цифра в разных историях означает разное: близость у тех, кто
+    // прошёл через вынужденный союз и чужой город, — не та же близость, что у
     // едва знакомых. Пройденные ступени и есть та история, по которой уровень
     // читается, и без них перевод в поведение остаётся голой арифметикой.
     const road = (relationship.ladder || []).filter(rung => rung.reached).map(rung => rung.title).filter(Boolean);
     const history = road.length > 1
-        ? `\nRead these against the road the two have actually travelled, which is what the levels were earned on: ${road.join(' → ')}.`
+        ? ` Read it against the road the two have actually travelled, which is what the levels were earned on: ${road.join(' → ')}.`
         : '';
-    // Заголовок называет происхождение строк: это не запись о случившемся,
-    // а пересчёт накопленных метрик в поведение. Без этого модель читает их
-    // как ещё один факт сцены и пересказывает его вслух.
-    return [`${CHAR}'s disposition towards ${USER}, read off the relationship levels Mnema has tracked so far — what trust, passion, devotion and attachment at their current values amount to in conduct. An estimate of how ${CHAR} would behave, not a record of anything that happened, and ${CHAR}'s side only:\n${lines.join('\n')}${history}`];
+    // Первая фраза называет происхождение строки: это не запись о случившемся,
+    // а пересчёт накопленных метрик в поведение. Без этого модель читает её как
+    // ещё один факт сцены и пересказывает его вслух.
+    return [`How ${CHAR} is disposed towards ${USER}, read off the relationship levels Mnema has tracked so far. An estimate of how ${CHAR} would behave, not a record of anything that happened, and ${CHAR}'s side only: ${stance}${history}`];
 }
 
 export function buildMemoryInjection(state, settings) {

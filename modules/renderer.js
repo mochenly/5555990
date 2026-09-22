@@ -7,7 +7,7 @@ import { escapeHtml } from './utils.js';
 import { t } from './i18n.js';
 import { RECAP_KEYS, RECAP_LABELS } from './arc-summary.js';
 import { galleryEnabled } from './gallery-data.js';
-import { dispositionText } from './disposition.js';
+import { uiDisposition } from './disposition.js';
 
 
 // Сводка приходит абзацами через пустую строку — в одном <p> они схлопнулись бы
@@ -300,22 +300,21 @@ export function createRenderer({ getState, getSettings, isProcessing, candidateI
         renderPhaseTrack(relationship);
         $('#mnema_relationship_progress_value').text(`${relationship.progress}%`);
         $('#mnema_relationship_progress_fill').css('width', `${relationship.progress}%`);
-        // Наблюдение анализа о том, как персонаж держится, тоже уходило только в
-        // промпт — в окне его не было нигде.
+        // Одна общая строка на все шкалы — то же, что уходит модели. Человек
+        // видел голые проценты и не мог узнать ни много это или мало, ни что от
+        // них меняется в ответе. Наблюдение анализа о том, как персонаж
+        // держится, тоже жило только в промпте.
+        const stance = uiDisposition(relationship, { char: people.charName, user: people.userName });
         const attitude = String(relationship.behavior || '').trim();
+        $('#mnema_relationship_conduct').prop('hidden', !stance && !attitude);
+        $('#mnema_relationship_stance').prop('hidden', !stance).text(stance);
         $('#mnema_relationship_behavior').prop('hidden', !attitude).text(attitude);
-        // Под каждой шкалой — то, во что её уровень превращается в поведении, тем
-        // же текстом, каким это уходит модели. Раньше это существовало только в
-        // промпте: человек видел «Доверие 4%» и не мог узнать ни что это значит,
-        // ни меняет ли оно вообще что-нибудь в ответах.
         $('#mnema_relationship_metrics').html(RELATIONSHIP_METRICS.map(([key, label, icon]) => {
             const value = relationship[key] || 0;
             const trend = relationship.trends?.[key] || 0;
-            const effect = dispositionText(key, value, { char: people.charName, user: people.userName });
             return `<section class="mnema-relationship-metric" data-metric="${key}">
                 <div><span><i class="fa-solid ${icon}"></i>${label}</span><strong>${value}% ${trend ? `<i class="fa-solid fa-arrow-${trend > 0 ? 'up' : 'down'}"></i>` : ''}</strong></div>
                 <div class="mnema-relationship-metric-track"><i style="width:${value}%"></i></div>
-                ${effect ? `<p class="mnema-relationship-metric-effect">${escapeHtml(effect)}</p>` : ''}
             </section>`;
         }).join(''));
     }

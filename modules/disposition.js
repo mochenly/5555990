@@ -1,83 +1,95 @@
+import { RELATIONSHIP_METRICS } from './config.js';
 import { t } from './i18n.js';
 
-// Что уровень шкалы означает для поведения персонажа — в двух видах сразу:
-// английский уходит в промпт, русский показывается в окне Мнемы. Лежат они
-// рядом намеренно. Разъедься они по разным файлам — и человек в попапе читал бы
-// одно, а модель получала бы другое, причём заметить расхождение было бы нечем:
-// оба текста выглядят правдоподобно поодиночке.
+// Во что шкалы отношений складываются в поведении — одной общей строкой, а не
+// разбором по каждой. Разбор давал четыре отдельных утверждения, которые никто
+// не сводил воедино: человек в окне читал спецификацию, а модель получала
+// таблицу вместо характера. Персонаж в сцене ведёт себя одним образом, и
+// описание у него должно быть одно.
 //
-// Само число ни там, ни там не помогает. Модель, увидев «доверие 62», либо
+// Само число не годится ни там, ни там. Модель, увидев «доверие 62», либо
 // проговаривает его вслух, либо игнорирует, но вести себя на 62 доверия не
 // начинает; человек, увидев «62%», не знает, много это или мало и что от этого
-// изменится в ответе. Поэтому обе стороны получают не значение, а то, во что
-// оно превращается: сдержанность, инициативу, готовность просить и отдавать.
+// изменится в ответе.
+//
+// Английский текст уходит в промпт, русский показывается в окне. Лежат они
+// рядом намеренно: разъедься они по разным файлам — и окно начало бы обещать
+// поведение, которого модель никогда не просили, причём незаметно, потому что
+// каждый текст поодиночке выглядит правдоподобно.
 
 const CHAR = '{{char}}';
 const USER = '{{user}}';
 
-export const PROMPT_BANDS = {
-    trust: [
-        `keeps their own affairs to themselves, checks what ${USER} says against what they see, and keeps a way out of any arrangement`,
-        `is civil but careful: shares facts rather than reasons, and lets ${USER} close only where little is at stake`,
-        `speaks plainly about their own affairs, asks ${USER} for help without making an event of it, and assumes good faith unless shown otherwise`,
-        `hides nothing that matters, acts on ${USER}'s word without verifying it, and lets ${USER} see them at a disadvantage`,
-    ],
-    passion: [
-        `feels no charge in nearness or touch; proximity to ${USER} is ordinary`,
-        `notices the pull and holds it back; it shows in small slips rather than in anything done on purpose`,
-        `seeks closeness, holds a look a beat too long, and takes the opening when a scene offers one`,
-        `wants ${USER} plainly enough that restraint costs visible effort, and it colours how they read every move ${USER} makes`,
-    ],
-    devotion: [
-        `puts their own interests first and helps only where it costs nothing`,
-        `shows up when asked and within reason, but does not rearrange their own life around ${USER}`,
-        `puts what ${USER} needs ahead of their own convenience and keeps promises that turn out expensive`,
-        `takes real losses for ${USER} without weighing them, treating ${USER}'s interest as the default rather than a decision`,
-    ],
-    attachment: [
-        `is unchanged by ${USER}'s absence`,
-        `notices ${USER} is gone and returns to their own business`,
-        `keeps ${USER} in mind between meetings and steers towards the next occasion to see them`,
-        `carries ${USER}'s absence as a weight and reads separation as loss, which shows in their attention and patience`,
-    ],
-};
+// Общая манера держаться. Считается по всем оценённым шкалам сразу: близость —
+// это не отдельно доверие и отдельно тяга, а то, что из них вместе выходит.
+const PROMPT_STANCE = [
+    `keeps ${USER} at arm's length: says little about themselves, checks what they are told, and helps only where it costs nothing`,
+    `is steady with ${USER} but not close: shares facts rather than reasons, shows up when asked, and stops well short of rearranging anything for them`,
+    `is close to ${USER}: speaks plainly about their own affairs, seeks their company, holds a look a beat too long, and puts what they need ahead of mere convenience`,
+    `lives with ${USER} inside their guard: hides nothing that matters, acts on their word without checking it, takes real losses for them without weighing them, and feels their absence as a weight`,
+];
 
-// Глаголы здесь только в настоящем времени третьего лица: в прошедшем русский
-// требует рода, а персонаж в чате может быть любого.
-export const UI_BANDS = {
-    trust: [
-        'Держится настороже: о своих делах молчит, слова {user} проверяет, путь к отступлению оставляет всегда',
-        'Держится вежливо, но осторожно: делится фактами, а не причинами, и подпускает {user} только туда, где нечего терять',
-        'Говорит о своих делах прямо и просит {user} о помощи без лишних предисловий',
-        'Не скрывает ничего важного, верит {user} на слово и позволяет застать себя врасплох',
-    ],
-    passion: [
-        'Близость и прикосновения ничего не меняют: рядом {user} или нет — одинаково',
-        'Тянет, но держит себя в руках — это прорывается в мелочах, а не в поступках',
-        'Ищет близости, задерживает взгляд и пользуется случаем, когда сцена его даёт',
-        'Хочет {user} настолько, что сдержанность стоит заметных усилий и окрашивает каждый жест в ответ',
-    ],
-    devotion: [
-        'Своё впереди чужого: помогает там, где это ничего не стоит',
-        'Приходит, когда просят, и в разумных пределах, но свою жизнь вокруг {user} не перестраивает',
-        'Ставит нужду {user} выше своего удобства и держит слово, даже когда оно дорого обходится',
-        'Идёт на настоящие потери ради {user} не раздумывая: чужой интерес здесь не решение, а исходная точка',
-    ],
-    attachment: [
-        'Отсутствие {user} ничего не меняет',
-        'Замечает, что {user} рядом нет, и возвращается к своим делам',
-        'Держит {user} в голове между встречами и ищет повод увидеться снова',
-        'Носит разлуку с собой как тяжесть, и это видно по вниманию и терпению',
-    ],
-};
+const UI_STANCE = [
+    'Держит {user} на расстоянии: о себе говорит скупо, сказанное проверяет и помогает там, где это ничего не стоит',
+    'Держится с {user} ровно, но без сближения: делится фактами, а не причинами, приходит, когда просят, и свою жизнь ни под что не перестраивает',
+    'Держится с {user} близко: говорит о своём прямо, ищет общества, задерживает взгляд и ставит чужую нужду выше собственного удобства',
+    'Пускает {user} за все свои границы: не скрывает ничего важного, верит на слово, идёт на настоящие потери не раздумывая и тяжело переносит разлуку',
+];
+
+// Одна шкала, ушедшая далеко от остальных, и есть то, что отличает этого
+// персонажа от любого другого с той же общей близостью: тяга без доверия и
+// доверие без тяги ведут себя очень по-разному.
+const STANDOUT_GAP = 18;
+
+const PROMPT_MOVE = { 1: 'lately it has been rising', '-1': 'lately it has been slipping' };
+const UI_MOVE = { 1: 'в последнее время это растёт', '-1': 'в последнее время это идёт на убыль' };
 
 export const dispositionBand = value => value >= 75 ? 3 : value >= 50 ? 2 : value >= 25 ? 1 : 0;
 
-// Ноль — «ещё не оценено», а не «нет доверия»: пустая шкала не должна ни
-// отыгрываться как холод, ни объявлять об этом человеку в окне.
-export function dispositionText(metric, value, names = {}) {
-    const bands = UI_BANDS[metric];
-    const level = Number(value);
-    if (!bands || !(level > 0)) return '';
-    return t(bands[dispositionBand(level)], { char: names.char || '{{char}}', user: names.user || '{{user}}' });
+const metricKeys = () => RELATIONSHIP_METRICS.map(([key]) => key);
+const metricLabel = key => RELATIONSHIP_METRICS.find(([metric]) => metric === key)?.[1] || key;
+
+// Ноль — «ещё не оценено», а не «нет доверия»: пустые шкалы не должны ни
+// отыгрываться как холод между героями, ни объявлять об этом в окне.
+function reading(relationship, trends = {}) {
+    const scored = metricKeys()
+        .map(key => ({ key, value: Number(relationship?.[key]) || 0 }))
+        .filter(item => item.value > 0);
+    if (!scored.length) return null;
+    const average = scored.reduce((sum, item) => sum + item.value, 0) / scored.length;
+    const sorted = [...scored].sort((a, b) => b.value - a.value);
+    const top = sorted[0];
+    const bottom = sorted.at(-1);
+    // Направление берём у общей близости: у каждой шкалы оно своё, и перечислять
+    // их по отдельности значит снова вернуться к разбору по статам.
+    const drift = Math.sign(scored.reduce((sum, item) => sum + (Math.sign(Number(trends?.[item.key]) || 0)), 0));
+    return {
+        band: dispositionBand(average),
+        high: sorted.length > 1 && top.value - average >= STANDOUT_GAP ? top.key : null,
+        low: sorted.length > 1 && average - bottom.value >= STANDOUT_GAP ? bottom.key : null,
+        drift,
+    };
+}
+
+export function promptDisposition(relationship, trends = {}) {
+    const read = reading(relationship, trends);
+    if (!read) return '';
+    const standout = [
+        read.high ? `${read.high} runs ahead of the rest` : '',
+        read.low ? `${read.low} lags behind it` : '',
+    ].filter(Boolean).join(', and ');
+    const move = PROMPT_MOVE[String(read.drift)] || '';
+    return [`${CHAR} ${PROMPT_STANCE[read.band]}`, standout, move].filter(Boolean).join('; ') + '.';
+}
+
+export function uiDisposition(relationship, names = {}) {
+    const read = reading(relationship, relationship?.trends);
+    if (!read) return '';
+    const vars = { char: names.char || '{{char}}', user: names.user || '{{user}}' };
+    const standout = [
+        read.high ? t('сильнее прочего — {metric}', { metric: t(metricLabel(read.high)).toLowerCase() }) : '',
+        read.low ? t('слабее прочего — {metric}', { metric: t(metricLabel(read.low)).toLowerCase() }) : '',
+    ].filter(Boolean).join(', ');
+    const move = UI_MOVE[String(read.drift)] ? t(UI_MOVE[String(read.drift)]) : '';
+    return [t(UI_STANCE[read.band], vars), standout, move].filter(Boolean).join('; ') + '.';
 }
