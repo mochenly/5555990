@@ -57,6 +57,20 @@ export const RELATIONSHIP_METRICS = Object.freeze([
 export const planKind = value => String(value || '').trim().toLowerCase() === 'world' ? 'world' : 'personal';
 export const isWorldPlan = plan => planKind(plan?.kind) === 'world';
 
+// Язык ответа модель выбирает по тому, что видит вокруг, и промпты работают
+// против неё: инструкции, ключи и примеры значений — английские, а язык
+// интерфейса и язык истории у половины пользователей разные. Просьбы «пиши на
+// языке пользователя» тут мало — «пользователя» модель ищет в том числе и в
+// самом промпте. Поэтому источник называем поимённо (только сообщения истории)
+// и отдельно снимаем право решать за неё с примеров и с уже записанных
+// значений: в состояние подписи попадают и от самого расширения.
+//
+// Живёт здесь, рядом с isWorldPlan: правило нужно каждому сборщику промптов, а
+// импортировать ради него сборщики друг из друга значит завести цикл.
+export const LANGUAGE_RULE = 'Language of the answer: write every natural-language value — titles, names, summaries, notes, labels, descriptions — in the language of the supplied story messages, whatever language that is. '
+    + 'Work it out from those messages alone. This instruction, the JSON keys and every example value are written in English as notation only and never indicate the output language; neither do values already present in the previous state, which may have been recorded by the extension itself rather than written in the story. '
+    + 'A Russian story is answered in Russian, an English one in English, and any other language in that language. Never translate the story into English, and never mix two languages in one answer. Keep JSON keys and enum codes exactly as specified, in English.';
+
 export const RELATIONSHIP_LADDER_LIMIT = 14;
 export const RELATIONSHIP_RUNG_TITLE_LIMIT = 40;
 export const RELATIONSHIP_RUNG_NOTE_LIMIT = 100;

@@ -479,9 +479,33 @@ const russian = /^ru\b|^ru-/i.test(String(getCurrentLocale() || ''));
  * @param {Record<string, string|number>} [vars]
  */
 export function t(text, vars = null) {
-    let result = russian ? text : (EN[text] ?? text);
+    return tLang(russian ? 'ru' : 'en', text, vars);
+}
+
+/**
+ * То же, но язык задаётся явно. Нужно там, где подпись уезжает не в окно, а в
+ * чат: заголовки сводок читает и модель, и для неё английский заголовок посреди
+ * русской истории — сигнал отвечать по-английски. Язык интерфейса к языку
+ * истории отношения не имеет, у половины русскоязычных SillyTavern английский.
+ * @param {'ru'|'en'} language
+ */
+export function tLang(language, text, vars = null) {
+    let result = language === 'ru' ? text : (EN[text] ?? text);
     if (vars) for (const [key, value] of Object.entries(vars)) result = result.split(`{${key}}`).join(String(value));
     return result;
+}
+
+/**
+ * Язык готового текста. Словарь у нас ровно двухсторонний, поэтому и различать
+ * нужно две раскладки: кириллица против всего остального. Имена и термины
+ * латиницей внутри русской фразы на счёт не влияют — их всегда меньшинство.
+ * @returns {'ru'|'en'}
+ */
+export function textLanguage(text) {
+    const sample = String(text || '').slice(0, 4000);
+    const cyrillic = (sample.match(/\p{Script=Cyrillic}/gu) || []).length;
+    const latin = (sample.match(/\p{Script=Latin}/gu) || []).length;
+    return cyrillic > latin ? 'ru' : 'en';
 }
 
 export function isRussianUi() {

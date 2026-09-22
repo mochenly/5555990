@@ -1,4 +1,4 @@
-import { t } from './i18n.js';
+import { textLanguage, tLang } from './i18n.js';
 
 // Текст сообщения-конспекта собирается в трёх местах: при создании арки, при
 // её пересборке по кнопке и при ручной правке в редакторе. Пока сборка была
@@ -55,18 +55,27 @@ export function resolvedThreadIndices(value, openThreads) {
     return [...found];
 }
 
-export function recapMarkdown(recap) {
+// Язык подписей здесь — язык самой сводки, а не интерфейса: этот текст стоит
+// в чате наравне с сообщениями и уходит в промпт обеими сторонами. Английская
+// шапка над русским конспектом (или наоборот) — ровно тот сор, из-за которого
+// модель начинает отвечать не на том языке, на котором идёт история.
+export function arcLanguage(arc) {
+    return textLanguage(`${arc?.summary || ''} ${arc?.title || ''}`);
+}
+
+export function recapMarkdown(recap, language = 'ru') {
     return RECAP_KEYS.filter(key => recap?.[key]?.length)
-        .map(key => `**${t(RECAP_LABELS[key])}**\n${recap[key].map(line => `- ${line}`).join('\n')}`)
+        .map(key => `**${tLang(language, RECAP_LABELS[key])}**\n${recap[key].map(line => `- ${line}`).join('\n')}`)
         .join('\n\n');
 }
 
 // Перечень уходит в то же сообщение, что и сводка: отдельной записью он потерял
 // бы место в хронологии, а в промпт основной модели попадает ровно так же.
 export function arcMessageText(arc) {
+    const language = arcLanguage(arc);
     return [
-        `### ${t('Конспект арки: {title}', { title: arc.title })}`,
+        `### ${tLang(language, 'Конспект арки: {title}', { title: arc.title })}`,
         arc.summary,
-        recapMarkdown(arc.recap),
+        recapMarkdown(arc.recap, language),
     ].filter(Boolean).join('\n\n');
 }

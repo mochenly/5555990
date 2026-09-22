@@ -25,13 +25,13 @@ import {
     STATE_KEY,
 } from './modules/config.js';
 import { clampPercent, contiguousRanges, escapeHtml, notify, resolveSurfaceColor } from './modules/utils.js';
-import { isRussianUi, observeTranslation, t } from './modules/i18n.js';
+import { isRussianUi, observeTranslation, t, tLang } from './modules/i18n.js';
 import { buildAnalysisPrompt as composeAnalysisPrompt, buildArcPrompt, buildMemoryInjection } from './modules/prompts.js';
 import { menuHtml, popupHtml } from './modules/template.js';
 import { applyCalendarUpdates, dateFromIso, formatCalendarDate, renderCalendar, syncCalendarDate } from './modules/calendar.js';
 import { fetchModels, parseJsonResponse, requestModel } from './modules/model-api.js';
 import { applyGalleryUpdates, applyHealthUpdate, applyRelationshipUpdate, applySecretsUpdate, applyWorldUpdate, createState, getState, normalizeState, reconcileStateWithChat, storeSnapshot } from './modules/state.js';
-import { arcMessageText, normalizeRecap, recapMarkdown, resolvedThreadIndices } from './modules/arc-summary.js';
+import { arcLanguage, arcMessageText, normalizeRecap, recapMarkdown, resolvedThreadIndices } from './modules/arc-summary.js';
 import { createRenderer } from './modules/renderer.js';
 import { createGalleryImages } from './modules/gallery-images.js';
 import { createSectionEditor } from './modules/editor.js';
@@ -658,8 +658,13 @@ async function consolidateArcs(chat, state, epoch) {
     const merged = state.arcs.slice(0, mergeCount);
     // В слияние отдаём сводки вместе с их перечнями: именно там живут
     // открытые линии и детали, которые иначе потерялись бы при пересказе пересказа.
+    // И заметки для слияния, и запасное название идут на языке истории, а не
+    // интерфейса: первые модель читает как историю, второе остаётся в чате
+    // заголовком сводки.
+    const language = arcLanguage(merged[0]);
     const { title, summary, recap } = await requestArcSummary(
-        merged.map(arc => [arc.summary, recapMarkdown(arc.recap)].filter(Boolean).join('\n\n')), t('Ранняя история'));
+        merged.map(arc => [arc.summary, recapMarkdown(arc.recap, language)].filter(Boolean).join('\n\n')),
+        tLang(language, 'Ранняя история'));
     if (epoch !== chatEpoch || getContext()?.chat !== chat) throw new Error('Чат сменился во время слияния арок');
 
     // Сводки сливаемых арок убираем с конца: удаление с головы сдвинуло бы

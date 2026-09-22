@@ -2,7 +2,7 @@ import { getContext } from '/scripts/extensions.js';
 import { user_avatar } from '/script.js';
 import { RELATIONSHIP_METRICS } from './config.js';
 import { dateFromIso, formatCalendarDate, renderCalendar } from './calendar.js';
-import { normalizeRelationship } from './state.js';
+import { normalizeRelationship, STAGE_UNSET } from './state.js';
 import { escapeHtml } from './utils.js';
 import { t } from './i18n.js';
 import { RECAP_KEYS, RECAP_LABELS } from './arc-summary.js';
@@ -116,7 +116,7 @@ export function createRenderer({ getState, getSettings, isProcessing, candidateI
         }
     
         const relationship = state?.relationship;
-        const hasRelationship = Boolean(settings.trackRelationships && relationship && (relationship.progress || relationship.phase || relationship.ladder?.length || relationship.stage !== 'Не определено'));
+        const hasRelationship = Boolean(settings.trackRelationships && relationship && (relationship.progress || relationship.phase || relationship.ladder?.length || relationship.stage !== STAGE_UNSET));
         $('#mnema_overview_relationship').prop('hidden', !hasRelationship);
         if (hasRelationship) {
             const people = getParticipantVisuals();

@@ -5,6 +5,12 @@ import { RELATIONSHIP_LADDER_LIMIT, RELATIONSHIP_METRICS, RELATIONSHIP_RUNG_NOTE
 import { clampPercent } from './utils.js';
 import { galleryEnabled } from './gallery-data.js';
 
+// Заглушка пустой стадии — подпись для окна, а не факт истории. Везде, где
+// состояние уезжает в промпт, её приходится отличать от настоящего значения:
+// русское слово посреди английской истории модель читает как указание на язык
+// ответа. Отсюда и константа вместо строкового литерала в пяти местах.
+export const STAGE_UNSET = 'Не определено';
+
 export function createState(chat) {
     return {
         version: 8,
@@ -14,7 +20,7 @@ export function createState(chat) {
         secrets: { revealed: [], unrevealed: [] },
         calendar: { currentDate: null, sourceMessageIndex: null, viewOffsetWeeks: 0, birthdays: [], plans: [] },
         health: { satiety: null, energy: null, mood: null, injuries: [] },
-        relationship: { ladder: [], phase: '', nextStep: '', stage: 'Не определено', behavior: '', progress: 0, trust: 0, passion: 0, devotion: 0, attachment: 0, trends: {}, updatedAt: null },
+        relationship: { ladder: [], phase: '', nextStep: '', stage: STAGE_UNSET, behavior: '', progress: 0, trust: 0, passion: 0, devotion: 0, attachment: 0, trends: {}, updatedAt: null },
         gallery: { memories: [], items: [] },
         world: { location: '', description: '', characterOutfit: '', userOutfit: '', indoor: null, clock: '', clockIndex: null, timeOfDay: '', weather: '', temperature: null, updatedAt: null },
     };
@@ -270,7 +276,7 @@ export function normalizeRelationship(value) {
         ladder,
         phase: phaseIndex >= 0 ? ladder[phaseIndex].id : '',
         nextStep: String(source.nextStep ?? source.next_step ?? '').trim().slice(0, 120),
-        stage: String(ladder[phaseIndex]?.title || source.stage || source.status || 'Не определено').slice(0, 40),
+        stage: String(ladder[phaseIndex]?.title || source.stage || source.status || STAGE_UNSET).slice(0, 40),
         behavior: String(source.behavior || '').trim().slice(0, 100),
         progress: clampPercent(source.progress),
         trust: clampPercent(source.trust),
