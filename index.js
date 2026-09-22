@@ -738,6 +738,35 @@ function renderInfoblockFor(messageIndex) {
     renderInfoblock(messageIndex, buildInfoblock({ scene, state: getState({ create: false }), settings, live, busy: Boolean(gallery?.status().busy), peek: peekedOwners() }));
 }
 
+// Плашка перерисовывается заменой узла, поэтому после неё нажатая кнопка стоит
+// на новом месте, а прокрутка — на старом. Запоминаем, где кнопка была в окне,
+// и сдвигаем чат ровно на разницу: под пальцем ничего не прыгает.
+function scrollParent(element) {
+    // Контейнер прокрутки ищем от самой кнопки: на телефоне вёрстка таверны
+    // другая, и #chat там не обязательно тот, кто едет.
+    for (let node = element?.parentElement; node; node = node.parentElement) {
+        const overflow = getComputedStyle(node).overflowY;
+        if ((overflow === 'auto' || overflow === 'scroll') && node.scrollHeight > node.clientHeight) return node;
+    }
+    return null;
+}
+
+function redrawInfoblockInPlace(button, messageIndex) {
+    const owner = button.dataset.peekOwner;
+    const scroller = scrollParent(button);
+    const top = button.getBoundingClientRect().top;
+    renderInfoblockFor(messageIndex);
+    if (!owner) return;
+    // Кнопка после перерисовки другая (та же колонка, но уже «скрыть»), ищем её
+    // в той же плашке по владельцу секретов.
+    const moved = document.querySelector(`.mes[mesid="${messageIndex}"] [data-peek-owner="${owner}"]`);
+    if (!moved) return;
+    const delta = moved.getBoundingClientRect().top - top;
+    if (!delta) return;
+    if (scroller) scroller.scrollTop += delta;
+    else window.scrollBy(0, delta);
+}
+
 function decorateInfoblocks() {
     if (!settings.infoblock) return removeInfoblocks();
     const chat = getContext()?.chat || [];
@@ -1256,7 +1285,11 @@ function bindEvents() {
         if (action === 'peek' || action === 'unpeek') {
             const owner = SECRET_OWNERS.includes(this.dataset.peekOwner) ? this.dataset.peekOwner : 'char';
             setSecretPeek(owner, action === 'peek');
-            return decorateInfoblocks();
+            // Перерисовываем одну эту плашку, а не весь чат: тело с секретами
+            // есть только у последней, остальные отдают одну шапку. И держим
+            // кнопку на месте — раскрытие меняет высоту, а замена узла сбивает
+            // браузеру якорь прокрутки, и чат уезжает вниз.
+            return redrawInfoblockInPlace(this, messageId);
         }
         if (action === 'open') return openPopup();
         if (action === 'edit') return sectionEditor.open();
