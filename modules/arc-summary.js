@@ -12,6 +12,12 @@ export const RECAP_LABELS = {
     threads: 'Осталось открытым',
 };
 
+// Промпт просит модель уложиться в это число строк на поле, но просьбу она
+// иногда игнорирует — тогда recap разрастается в тот же построчный пересказ,
+// от которого мы его отделяли. Лимиты здесь режут по живому вне зависимости
+// от того, что вернул ответ.
+const RECAP_LIMITS = { events: 4, details: 5, npcs: 4, threads: 3 };
+
 // Перечень приводим к одному виду независимо от того, что вернула модель:
 // строка вместо списка, объекты вместо строк, пустые хвосты — всё это обычные
 // ответы, и разбираться с ними в момент отрисовки поздно.
@@ -26,7 +32,7 @@ export function normalizeRecap(value) {
             .filter(item => item !== null && item !== undefined)
             .map(item => String(typeof item === 'object' ? (item.text ?? item.title ?? item.name ?? '') : item).trim())
             .filter(Boolean)
-            .slice(0, 12);
+            .slice(0, RECAP_LIMITS[key]);
         if (lines.length) recap[key] = lines;
     }
     return recap;

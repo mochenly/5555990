@@ -225,13 +225,17 @@ export function buildArcPrompt(notes, participants = {}, openThreads = []) {
                 + 'One paragraph per seam, each a few sentences of connected prose — not a list, not a chronicle of every message. '
                 + 'A short arc may need only two paragraphs; a long one more. Never start a paragraph by repeating what the previous one just said.',
             // Связный текст пересказывает, но плохо отвечает на вопрос «что тут
-            // нельзя забыть». Отсюда отдельный перечень, годный для беглого взгляда.
-            'After the prose, fill recap: a scannable list of what must survive this arc. '
-                + 'events: what actually happened, one short line each, in order. '
-                + 'details: concrete things worth remembering later — objects, names, places, numbers, promises, injuries, changed circumstances. '
-                + 'npcs: anyone other than the two protagonists who mattered here, each with what they did and where they stand now; omit the field entirely when no one else appeared. '
-                + 'threads: what is left open and could continue — an unanswered question, an unpaid debt, a threat, an unkept promise, a suspicion. Omit the field when the arc genuinely closes everything. '
-                + 'Every recap line is one clause, max 120 characters, a fact from the notes and never a guess about the future. Do not restate the whole summary here; recap is for what a later reader would otherwise have to dig for.',
+            // нельзя забыть». recap для этого и нужен — но по умолчанию модель
+            // читает «events: what happened» как приглашение переписать те же
+            // абзацы построчно. Явные потолки и тест «забудут — понадобится»
+            // держат его карточкой, а не вторым пересказом.
+            'After the prose, fill recap: a short card of what must survive this arc, strictly shorter than the summary above it, never a second telling of it. '
+                + 'Before adding any line, apply this test: would a reader who only has the prose summary be missing this fact, and will they need it later? If the prose already covers it, or nothing will ever refer back to it, leave it out. '
+                + 'events: at most 4 lines, ONLY the turning points — a decision, a discovery, a reversal, a point of no return. Not a chronicle of every beat in the prose; if you cannot compress the arc to 4 pivots, you are listing scenes, not turns. '
+                + 'details: at most 5 lines, concrete facts a later interval will need and could not otherwise be checked against — a name, a number, an object, a promise, an injury, a changed circumstance. Drop anything that only mattered in the moment it happened. '
+                + 'npcs: at most 4, anyone besides the two protagonists who mattered here, each with what they did and where they stand now; omit the field entirely when no one else appeared. '
+                + 'threads: at most 3, and only ones with real stakes going forward — a debt, a threat, an exposed secret, a standing suspicion. Not every unanswered question qualifies; omit the field when the arc genuinely closes everything. '
+                + 'Every recap line is one clause, max 120 characters, a fact from the notes and never a guess about the future.',
             // Открытые линии прошлых арок — единственная часть перечня, которая
             // протухает сама по себе: долг отдали, вопрос получил ответ. Просим
             // отметить такие здесь же, чтобы не тратить отдельный запрос.
