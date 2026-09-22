@@ -24,10 +24,14 @@ export const DEFAULT_SETTINGS = Object.freeze({
     model: '',
     trackRelationships: true,
     trackCalendar: true,
-    trackHealth: true,
+    // Здоровье и галерея выключены, пока их не включили: оба раздела заметно
+    // утяжеляют и промпт анализа, и плашку, а нужны далеко не каждой истории.
+    // Подпереключатели галереи остаются включёнными — тогда при включении
+    // раздела он сразу работает целиком, а не требует второго захода.
+    trackHealth: false,
     trackSecrets: true,
     secretLimits: Object.freeze({ user: 10, char: 10, world: 10 }),
-    collectGallery: true,
+    collectGallery: false,
     galleryMemoriesEnabled: true,
     galleryMemoryMode: 'auto',
     galleryKeepsakesEnabled: true,
