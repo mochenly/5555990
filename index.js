@@ -1117,6 +1117,22 @@ async function analyzeManualRange(input) {
     }
 }
 
+async function confirmRelationshipRebuild() {
+    const context = getContext();
+    const state = getState({ create: false });
+    if (!context?.chat?.length) { notify('Откройте чат', 'error'); return false; }
+    const reached = (state?.relationship?.ladder || []).filter(rung => rung.reached).length;
+    const confirmed = await context.callGenericPopup(
+        `<h3>${t('Пересобрать раздел отношений?')}</h3>`
+        + `<p>${t('Модель перечитает историю чата вместе со сводками арок и соберёт лестницу, стадию и все шкалы заново.')}</p>`
+        + `<p>${t('Записанное сейчас (пройденных ступеней: {n}) будет заменено целиком, включая правки, внесённые вручную. При ошибке или отмене всё останется как есть.', { n: reached })}</p>`,
+        context.POPUP_TYPE.CONFIRM,
+        '',
+        { okButton: t('Пересобрать'), cancelButton: t('Отмена') },
+    );
+    return confirmed === context.POPUP_RESULT.AFFIRMATIVE;
+}
+
 async function analyzeWholeChat() {
     if (processing || gallery.status().busy) return;
     const context = getContext();
@@ -1260,7 +1276,12 @@ function bindEvents() {
         if (this.checked) decorateInfoblocks(); else removeInfoblocks();
     });
     $(document).on('click', '[data-mnema-focus]', function () {
-        void focus.generate(this.dataset.mnemaFocus, SECRET_OWNERS.includes(this.dataset.focusOwner) ? this.dataset.focusOwner : 'char');
+        const kind = this.dataset.mnemaFocus;
+        const owner = SECRET_OWNERS.includes(this.dataset.focusOwner) ? this.dataset.focusOwner : 'char';
+        // Остальные кнопки только добавляют записи, эта переписывает раздел
+        // набело — спрашиваем, прежде чем потерять записанную лестницу.
+        if (kind === 'relationship') void confirmRelationshipRebuild().then(ok => { if (ok) void focus.generate(kind, owner); });
+        else void focus.generate(kind, owner);
     });
     // Листание ступеней меняет только показанную карточку, поэтому плашку не
     // перерисовываем: перерисовка сбросила бы выбор обратно на текущую ступень.

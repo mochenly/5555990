@@ -215,6 +215,13 @@ body.mnema-popup-open { overflow: hidden; }
     letter-spacing: 0.35px;
 }
 
+/* Кнопка в заголовке раздела не должна читаться как часть самого заголовка:
+   margin-left: auto уводит её к правому краю, а приглушённый цвет оставляет
+   первым словом строки название раздела. */
+.mnema-tab-title .mnema-section-edit { color: var(--mnema-muted); font-size: 12px; transition: color 160ms ease; }
+.mnema-tab-title .mnema-section-edit:hover:not(:disabled) { color: var(--mnema-accent); }
+.mnema-tab-title .mnema-section-edit:disabled { opacity: 0.45; cursor: default; }
+
 .mnema-glass-card, .mnema-note, .mnema-arc {
     color: var(--mnema-text);
     background: var(--mnema-glass);
@@ -1446,11 +1453,17 @@ body.mnema-popup-open { overflow: hidden; }
 html[data-mnema-lang="en"] .mes.mnema-arc-message .ch_name .name_text::after { content: ' · story memory'; }
 
 /* Исходные сообщения арки из чата не удаляются: на них лежат снимки состояния
-   и по ним идёт пересчёт всего чата. В ленте их заменяет полоска-раскрывашка. */
-#chat .mes.mnema-arc-source:not(.mnema-arc-unfolded) { display: none; }
+   и по ним идёт пересчёт всего чата. В ленте их заменяет полоска-раскрывашка.
+   `!important` и префикс `html body` здесь обязательны: многие пользовательские
+   темы переопределяют раскладку сообщения через `.mes { display: flex !important }`
+   (Liquid Glass Hearts, wine soaked letters и другие), и без этого свёрнутые
+   исходники остаются видимыми — полоска появляется, а стена сообщений под ней
+   никуда не девается. Запас по специфичности берём на темы, которые целятся
+   ещё и в атрибут (`#chat .mes[is_user="true"]`). */
+html body #chat .mes.mnema-arc-source:not(.mnema-arc-unfolded) { display: none !important; }
 
-#chat .mnema-arc-fold {
-    display: flex;
+html body #chat .mnema-arc-fold {
+    display: flex !important;
     align-items: center;
     gap: 9px;
     margin: 6px 10px;

@@ -156,7 +156,7 @@ export function popupHtml() {
                             </div>
                         </section>
                         <section class="mnema-tab-panel" data-mnema-panel="relationships">
-                            <div class="mnema-tab-title"><span>✦</span> Отношения</div>
+                            <div class="mnema-tab-title"><span>✦</span> Отношения<button type="button" class="mnema-section-edit" data-mnema-focus="relationship" data-focus-icon="fa-solid fa-arrows-rotate" title="Пересобрать раздел по всей истории" aria-label="Пересобрать раздел по всей истории"><i class="fa-solid fa-arrows-rotate"></i></button></div>
                             <article class="mnema-relationship-card">
                                 <div class="mnema-relationship-people">
                                     <figure><span><img id="mnema_user_avatar" alt=""></span><figcaption id="mnema_user_name">{{user}}</figcaption></figure>

@@ -153,6 +153,17 @@ const EN = {
     'Модель не предложила ни одного нового секрета': 'The model proposed no new secret',
     'Добавлено секретов: {n}': 'Secrets added: {n}',
 
+    // ── Пересборка отношений ───────────────────────────────────────────────
+    'Пересобрать раздел по всей истории': 'Rebuild the section from the whole story',
+    'Пересобрать раздел отношений?': 'Rebuild the relationship section?',
+    'Модель перечитает историю чата вместе со сводками арок и соберёт лестницу, стадию и все шкалы заново.': 'The model will re-read the chat history together with the arc summaries and rebuild the ladder, the stage and every scale from scratch.',
+    'Записанное сейчас (пройденных ступеней: {n}) будет заменено целиком, включая правки, внесённые вручную. При ошибке или отмене всё останется как есть.': 'What is recorded now (steps taken: {n}) will be replaced outright, including edits made by hand. On an error or a cancel nothing changes.',
+    'Пересобрать': 'Rebuild',
+    'Раздел «Отношения» выключен в настройках': 'The Relationships section is switched off in settings',
+    'Модель вернула пустой раздел отношений': 'The model returned an empty relationship section',
+    'Модель не вернула ни одной ступени отношений': 'The model returned no relationship step at all',
+    'Раздел отношений пересобран · ступеней: {n}': 'Relationship section rebuilt · steps: {n}',
+
     // ── Календарь ──────────────────────────────────────────────────────────
     'Дата не определена': 'Date not set',
     'Дата не задана': 'Date not set',
