@@ -162,6 +162,7 @@ const EN = {
     'Раздел «Отношения» выключен в настройках': 'The Relationships section is switched off in settings',
     'Модель вернула пустой раздел отношений': 'The model returned an empty relationship section',
     'Модель не вернула ни одной ступени отношений': 'The model returned no relationship step at all',
+    'Модель не оставила ни одной ступени впереди — нажмите пересборку ещё раз': 'The model left no step ahead — press rebuild again',
     'Раздел отношений пересобран · ступеней: {n}': 'Relationship section rebuilt · steps: {n}',
 
     // ── Календарь ──────────────────────────────────────────────────────────

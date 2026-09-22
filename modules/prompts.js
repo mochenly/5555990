@@ -68,12 +68,19 @@ function unrecordedFields(state, settings) {
 // совпадать дословно, иначе два пути начнут строить разные лестницы на одной и
 // той же истории.
 function relationshipSchema(rebuild = false) {
+    const rung = extra => ({
+        ...(rebuild ? {} : { id: 'Existing id when renaming a recorded rung; omit for new rungs' }),
+        ...extra,
+        note: 'What has to happen for this step to count, max 100 characters',
+    });
     return {
-        ladder: [{
-            ...(rebuild ? {} : { id: 'Existing id when renaming a recorded rung; omit for new rungs' }),
-            title: 'Concrete shared event or step, 1-4 words',
-            note: 'What has to happen for this step to count, max 100 characters',
-        }],
+        // Форму лестницы показываем прямо в схеме: одной строкой-примером модель
+        // читает её как «перечисли, что было», и обрывает список на текущем дне.
+        ladder: [
+            rung({ title: 'Relationship step already taken, 1-4 words' }),
+            rung({ title: 'The step after it, not taken yet' }),
+            rung({ title: 'The one after that, further ahead' }),
+        ],
         phase: 'Exact title of the latest step already taken',
         next_step: 'Nearest missing agreement or milestone, max 120 characters; empty if none',
         stage: 'Same title as phase',
@@ -84,19 +91,21 @@ function relationshipSchema(rebuild = false) {
 
 function relationshipRules(rebuild = false) {
     return [
-        'The relationship ladder is a timeline of concrete things the two of them do together — events and steps, not states of feeling and NOT a literary description of their bond. '
+        'The relationship ladder is the path a relationship travels — the recognized stages two people pass through, named in the terms of this particular story. It is NOT a chronicle of the plot, NOT a list of scenes, and NOT a literary description of their bond. '
+            + 'A rung must be a step in the relationship itself: what the two of them became to each other, not what happened around them. The test: strip away the setting, and the title should still be a step some other pair could take in some other story. "First date", "moved in together", "said it out loud", "met the family", "first favour", "open falling-out" pass that test. "Letter seized", "night corridor standoff", "hospital wing threat", "covered her session" do not — those are scenes from a plot, and a ladder made of them is worthless, because it shows where the story went instead of where the relationship stands. When a scene does mark a real turn, name the turn and not the scene: a fight over a seized letter that ends the pretending is "stopped pretending", not "letter seized". '
             + `Use only as many distinct steps as useful, at most ${RELATIONSHIP_LADDER_LIMIT}; no minimum and no filler. Plain titles of 1-4 words, max 40 characters, in the conversation language. Examples: first meeting, first date, confession of feelings, meeting the parents, moving in together, proposal, planning a wedding, wedding. Use only steps appropriate to this story; friendship, rivalry and professional relationships have their own steps — first favour, shared job, public falling-out — and do not have to become romance or end in marriage. Never use metaphors such as shared shelter, fragile bridge or intertwined souls, degrees of emotional warmth, moods, or scene titles. A title naming a feeling or a state of the bond rather than something that happened is wrong: "dangerous closeness" and "fragile trust" are states, "first date" and "proposal" are steps. `
             + 'Each note is ONE concrete condition for the step to count, max 100 characters, not advice on behavior. A date requires an agreed meeting both treat as a date; a confession requires it actually said aloud; meeting the parents requires the meeting to happen; a proposal requires it made and answered; planning a wedding requires an actual decision to plan it; a wedding requires the ceremony or its equivalent. Flirting, kissing, sex, affection and high metrics do not by themselves complete a step. Do not invent consent or make decisions for the user character. '
             + (rebuild
-                ? 'Build the ladder from nothing but the supplied story: every step it actually establishes, in the order it establishes them, and not one it does not. Whatever was recorded before is being discarded, so do not reproduce old wording, old steps or an old count out of deference to them. '
+                ? 'Build the ladder afresh: the story decides which rungs have been REACHED, never how far the ladder itself extends. Work out what kind of relationship this is, lay out the stages such a relationship passes through, and place the two of them on it. Whatever was recorded before is being discarded, so do not reproduce old wording or an old count out of deference to it. '
                 : 'Preserve recorded history, rung ids and reached flags. If an existing title names a state or a mood rather than an event, rename it to the event that actually established it, reusing its existing id; this corrects wording, not history or progress. Do not append duplicates of old renamed steps. ')
-            + 'Future steps are optional possibilities, not a predicted destiny. '
-            + 'phase is the exact title of the latest step actually taken in the supplied story, never an aspiration. No change without evidence that its condition was met. next_step is ONLY the nearest missing concrete agreement or milestone before the next step, e.g. offer to be a couple and receive an answer. One short clause, max 120 characters, no dialogue script, emotional essay or behavioral instructions. Return an empty string when there is no appropriate next step. When an old next_step is verbose or vague, replace it now.',
+            + 'The ladder must not stop at the present day. After the rung they have actually reached, give 2 to 4 more that this relationship would plausibly pass through next, still untaken — they are possibilities, not a predicted destiny, and the nearest of them is the one the story is currently leaning towards. A ladder whose last rung is the current phase is wrong and useless: the whole point of the thing is to show what lies ahead. '
+            + 'phase is the exact title of the latest step actually taken in the supplied story, never an aspiration. No change without evidence that its condition was met. '
+            + 'next_step belongs to the ladder, not to the plot: it names what is still missing before the NEXT untaken rung counts as reached, and it must match that rung. If the next rung is "said it out loud", next_step is that one of them has to say it and the other has to answer — not what either of them is scheming to do with a letter. A next_step that reads as a summary of where the plot is heading is wrong, and so is one that no rung on the ladder corresponds to. One short clause, max 120 characters, no dialogue script, emotional essay or behavioral instructions. Return an empty string only when the ladder genuinely has no rung left ahead. When an old next_step is verbose or vague, replace it now.',
         'stage repeats the title of the current step, never a second poetic label. behavior is optional: one observed attitude in at most 12 words / 100 characters, not instructions about how to speak, touch, feel or act. Return behavior="" when it adds nothing; replace old verbose behavioral scripts with an empty string or a short observation. '
             + (rebuild
                 ? 'Metrics describe supported feelings and never authorize a step transition. Score all five from the supplied story as a whole, 0..100 each: what the two have actually been through together, not the temperature of the latest scene. Return every one of them — this answer replaces the recorded values outright, so an omitted metric is a lost one. '
                 : 'Metrics describe supported feelings, never authorize a step transition; ordinary scenes change them by 0..3. Return absolute values for changed metrics only. ')
-            + 'On first analysis return the steps the supplied story actually shows and the supported metrics, without inventing a relationship history or future commitments.',
+            + 'Mark as reached only the steps the supplied story actually shows, and score only the metrics it supports: inventing a history the two never had is the one unforgivable error here. Rungs ahead are the exception and are expected — they are where the relationship could go, not something anybody has committed to.',
     ];
 }
 
