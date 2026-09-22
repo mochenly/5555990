@@ -1,6 +1,7 @@
 import { secretRules } from './secrets.js';
 import { galleryEnabled } from './gallery-data.js';
 import { isWorldPlan, RELATIONSHIP_LADDER_LIMIT } from './config.js';
+import { dispositionBand, PROMPT_BANDS } from './disposition.js';
 
 export const rungTitle = relationship => (relationship?.ladder || []).find(rung => rung.id === relationship?.phase)?.title || '';
 
@@ -411,53 +412,18 @@ function conditionLine(health) {
     return parts.length ? `${CHAR} now: ${parts.join('; ')}` : '';
 }
 
-// Метрики отношений до сих пор не доезжали до основной модели вовсе: их считал
-// анализ, рисовала плашка, а на отыгрыш они не влияли никак. Само число этого и
-// не исправило бы — «доверие 62» модель либо проговаривает вслух, либо
-// игнорирует, но вести себя на 62 доверия от него не начинает. Поэтому в промпт
-// уходит не значение, а то, что оно означает для поведения {{char}}: его
-// сдержанность, инициатива, готовность просить и отдавать.
-const RELATIONSHIP_BANDS = {
-    trust: [
-        `keeps their own affairs to themselves, checks what ${USER} says against what they see, and keeps a way out of any arrangement`,
-        `is civil but careful: shares facts rather than reasons, and lets ${USER} close only where little is at stake`,
-        `speaks plainly about their own affairs, asks ${USER} for help without making an event of it, and assumes good faith unless shown otherwise`,
-        `hides nothing that matters, acts on ${USER}'s word without verifying it, and lets ${USER} see them at a disadvantage`,
-    ],
-    passion: [
-        `feels no charge in nearness or touch; proximity to ${USER} is ordinary`,
-        `notices the pull and holds it back; it shows in small slips rather than in anything done on purpose`,
-        `seeks closeness, holds a look a beat too long, and takes the opening when a scene offers one`,
-        `wants ${USER} plainly enough that restraint costs visible effort, and it colours how they read every move ${USER} makes`,
-    ],
-    devotion: [
-        `puts their own interests first and helps only where it costs nothing`,
-        `shows up when asked and within reason, but does not rearrange their own life around ${USER}`,
-        `puts what ${USER} needs ahead of their own convenience and keeps promises that turn out expensive`,
-        `takes real losses for ${USER} without weighing them, treating ${USER}'s interest as the default rather than a decision`,
-    ],
-    attachment: [
-        `is unchanged by ${USER}'s absence`,
-        `notices ${USER} is gone and returns to their own business`,
-        `keeps ${USER} in mind between meetings and steers towards the next occasion to see them`,
-        `carries ${USER}'s absence as a weight and reads separation as loss, which shows in their attention and patience`,
-    ],
-};
-
-const band = value => value >= 75 ? 3 : value >= 50 ? 2 : value >= 25 ? 1 : 0;
-
 // Направление важнее уровня: доверие, которое только что просело, ведёт себя
 // иначе, чем то же доверие, стоявшее там всегда. Знак уже посчитан анализом.
 const TRENDS = { 1: 'recently rose', '-1': 'recently dropped' };
 
 function relationshipDisposition(relationship, trends = {}) {
-    const lines = Object.entries(RELATIONSHIP_BANDS)
+    const lines = Object.entries(PROMPT_BANDS)
         // Ноль — это «ещё не оценено», а не «нет доверия»: пустой раздел не
         // должен отыгрываться как холод между героями.
         .filter(([metric]) => Number(relationship[metric]) > 0)
         .map(([metric, bands]) => {
             const move = TRENDS[String(Math.sign(Number(trends?.[metric]) || 0))];
-            return `- ${metric}: ${CHAR} ${bands[band(Number(relationship[metric]))]}${move ? `; it ${move}` : ''}.`;
+            return `- ${metric}: ${CHAR} ${bands[dispositionBand(Number(relationship[metric]))]}${move ? `; it ${move}` : ''}.`;
         });
     if (!lines.length) return [];
     // Одна и та же цифра в разных историях означает разное: доверие 58 у тех,

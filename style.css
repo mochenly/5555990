@@ -600,6 +600,14 @@ body.mnema-popup-open { overflow: hidden; }
     transition: width 600ms cubic-bezier(.16, 1, .3, 1);
 }
 
+.mnema-relationship-conduct { margin: 18px 0 9px; }
+.mnema-relationship-conduct > small { color: var(--mnema-muted); font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+.mnema-relationship-behavior { margin: 7px 0 0; font-size: 12px; line-height: 1.5; }
+
+/* Расшифровка уровня набрана мельче самой шкалы и приглушена: это пояснение к
+   цифре, а не вторая цифра. */
+.mnema-relationship-metric-effect { margin: 0; color: var(--mnema-muted); font-size: 11px; line-height: 1.45; }
+
 .mnema-relationship-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
 
 .mnema-relationship-metric {

@@ -173,6 +173,10 @@ export function popupHtml() {
                                     <div><span>Общий прогресс</span><strong id="mnema_relationship_progress_value">0%</strong></div>
                                     <div class="mnema-relationship-track"><i id="mnema_relationship_progress_fill"></i></div>
                                 </div>
+                                <div class="mnema-relationship-conduct">
+                                    <small>Что это меняет в поведении</small>
+                                    <p id="mnema_relationship_behavior" class="mnema-relationship-behavior" hidden></p>
+                                </div>
                                 <div id="mnema_relationship_metrics" class="mnema-relationship-metrics"></div>
                             </article>
                         </section>

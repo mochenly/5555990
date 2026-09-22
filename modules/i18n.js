@@ -163,6 +163,25 @@ const EN = {
     'Модель вернула пустой раздел отношений': 'The model returned an empty relationship section',
     'Модель не вернула ни одной ступени отношений': 'The model returned no relationship step at all',
     'Модель не оставила ни одной ступени впереди — нажмите пересборку ещё раз': 'The model left no step ahead — press rebuild again',
+
+    // ── Что шкалы означают в поведении (то же, что уходит в промпт) ─────────
+    'Что это меняет в поведении': 'What this changes in behaviour',
+    'Держится настороже: о своих делах молчит, слова {user} проверяет, путь к отступлению оставляет всегда': 'Keeps their own affairs to themselves, checks what {user} says against what they see, and always keeps a way out',
+    'Держится вежливо, но осторожно: делится фактами, а не причинами, и подпускает {user} только туда, где нечего терять': 'Civil but careful: shares facts rather than reasons, and lets {user} close only where little is at stake',
+    'Говорит о своих делах прямо и просит {user} о помощи без лишних предисловий': 'Speaks plainly about their own affairs and asks {user} for help without making an event of it',
+    'Не скрывает ничего важного, верит {user} на слово и позволяет застать себя врасплох': 'Hides nothing that matters, takes {user} at their word, and lets themselves be caught at a disadvantage',
+    'Близость и прикосновения ничего не меняют: рядом {user} или нет — одинаково': 'Nearness and touch change nothing: {user} close by or not makes no difference',
+    'Тянет, но держит себя в руках — это прорывается в мелочах, а не в поступках': 'Feels the pull and holds it back — it shows in small slips rather than in anything done on purpose',
+    'Ищет близости, задерживает взгляд и пользуется случаем, когда сцена его даёт': 'Seeks closeness, holds a look a beat too long, and takes the opening when a scene offers one',
+    'Хочет {user} настолько, что сдержанность стоит заметных усилий и окрашивает каждый жест в ответ': 'Wants {user} enough that restraint costs visible effort, and it colours how they read every move in return',
+    'Своё впереди чужого: помогает там, где это ничего не стоит': 'Own interests first: helps where it costs nothing',
+    'Приходит, когда просят, и в разумных пределах, но свою жизнь вокруг {user} не перестраивает': 'Shows up when asked and within reason, but does not rearrange their life around {user}',
+    'Ставит нужду {user} выше своего удобства и держит слово, даже когда оно дорого обходится': 'Puts what {user} needs ahead of their own convenience and keeps promises that turn out expensive',
+    'Идёт на настоящие потери ради {user} не раздумывая: чужой интерес здесь не решение, а исходная точка': 'Takes real losses for {user} without weighing them: their interest is the default, not a decision',
+    'Отсутствие {user} ничего не меняет': 'Unchanged by {user} being away',
+    'Замечает, что {user} рядом нет, и возвращается к своим делам': 'Notices {user} is gone and returns to their own business',
+    'Держит {user} в голове между встречами и ищет повод увидеться снова': 'Keeps {user} in mind between meetings and looks for the next occasion to see them',
+    'Носит разлуку с собой как тяжесть, и это видно по вниманию и терпению': 'Carries the separation as a weight, and it shows in their attention and patience',
     'Раздел отношений пересобран · ступеней: {n}': 'Relationship section rebuilt · steps: {n}',
 
     // ── Календарь ──────────────────────────────────────────────────────────
