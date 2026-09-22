@@ -39,6 +39,10 @@ body.mnema-popup-open { overflow: hidden; }
     min-height: 520px;
     overflow: hidden;
     color: var(--mnema-text);
+    /* Сплошной цвет подставляет JS: подложку темы нельзя просто сделать
+       непрозрачной, потому что у половины тем она почти прозрачна и её RGB
+       ничего не значит. Значение здесь — запасное, на случай если расчёт не
+       сработал. Подробности в resolveSurfaceColor. */
     background: var(--mnema-surface);
     border: 1px solid var(--mnema-border);
     border-radius: 20px;

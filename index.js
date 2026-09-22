@@ -24,7 +24,7 @@ import {
     RELATIONSHIP_METRICS,
     STATE_KEY,
 } from './modules/config.js';
-import { clampPercent, contiguousRanges, escapeHtml, notify } from './modules/utils.js';
+import { clampPercent, contiguousRanges, escapeHtml, notify, resolveSurfaceColor } from './modules/utils.js';
 import { isRussianUi, observeTranslation, t } from './modules/i18n.js';
 import { buildAnalysisPrompt as composeAnalysisPrompt, buildArcPrompt, buildMemoryInjection } from './modules/prompts.js';
 import { menuHtml, popupHtml } from './modules/template.js';
@@ -251,6 +251,9 @@ function messageLabel(chat, index) {
 function openPopup() {
     const popup = document.getElementById(POPUP_ID);
     if (!popup) return;
+    // Тему SillyTavern могли сменить, пока Мнема была закрыта, поэтому цвет
+    // окна считаем на каждом открытии, а не один раз при загрузке.
+    popup.style.setProperty('--mnema-surface', resolveSurfaceColor(getComputedStyle(document.body)));
     popup.hidden = false;
     document.body.classList.add('mnema-popup-open');
     syncSettingsUi();
