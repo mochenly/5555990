@@ -604,8 +604,7 @@ body.mnema-popup-open { overflow: hidden; }
    образом, и описание у него одно, а не по строке на каждый процент. */
 .mnema-relationship-conduct { margin: 14px 0 0; padding: 12px 13px; background: color-mix(in srgb, var(--mnema-text) 3%, transparent); border: 1px solid var(--mnema-border-soft); border-radius: 12px; }
 .mnema-relationship-conduct > small { color: var(--mnema-muted); font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
-.mnema-relationship-stance { margin: 7px 0 0; font-size: 12px; line-height: 1.5; }
-.mnema-relationship-behavior { margin: 6px 0 0; color: var(--mnema-muted); font-size: 11px; line-height: 1.45; }
+.mnema-relationship-behavior { margin: 7px 0 0; font-size: 12px; line-height: 1.5; }
 
 .mnema-relationship-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
 

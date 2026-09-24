@@ -7,7 +7,6 @@ import { escapeHtml } from './utils.js';
 import { t } from './i18n.js';
 import { RECAP_KEYS, RECAP_LABELS } from './arc-summary.js';
 import { galleryEnabled } from './gallery-data.js';
-import { uiDisposition } from './disposition.js';
 
 
 // Сводка приходит абзацами через пустую строку — в одном <p> они схлопнулись бы
@@ -300,14 +299,12 @@ export function createRenderer({ getState, getSettings, isProcessing, candidateI
         renderPhaseTrack(relationship);
         $('#mnema_relationship_progress_value').text(`${relationship.progress}%`);
         $('#mnema_relationship_progress_fill').css('width', `${relationship.progress}%`);
-        // Одна общая строка на все шкалы — то же, что уходит модели. Человек
-        // видел голые проценты и не мог узнать ни много это или мало, ни что от
-        // них меняется в ответе. Наблюдение анализа о том, как персонаж
-        // держится, тоже жило только в промпте.
-        const stance = uiDisposition(relationship, { char: people.charName, user: people.userName });
+        // Что шкалы меняют в поведении, пишет анализ — то же самое слово в слово
+        // уходит и модели. Считать это в расширении не выйдет: по одним и тем же
+        // числам у каждого персонажа получается своё поведение, а шаблон выдавал
+        // всем один и тот же текст.
         const attitude = String(relationship.behavior || '').trim();
-        $('#mnema_relationship_conduct').prop('hidden', !stance && !attitude);
-        $('#mnema_relationship_stance').prop('hidden', !stance).text(stance);
+        $('#mnema_relationship_conduct').prop('hidden', !attitude);
         $('#mnema_relationship_behavior').prop('hidden', !attitude).text(attitude);
         $('#mnema_relationship_metrics').html(RELATIONSHIP_METRICS.map(([key, label, icon]) => {
             const value = relationship[key] || 0;

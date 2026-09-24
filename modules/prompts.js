@@ -1,7 +1,6 @@
 import { secretRules } from './secrets.js';
 import { galleryEnabled } from './gallery-data.js';
 import { isWorldPlan, LANGUAGE_RULE, RELATIONSHIP_LADDER_LIMIT } from './config.js';
-import { promptDisposition } from './disposition.js';
 import { STAGE_UNSET } from './state.js';
 
 export const rungTitle = relationship => (relationship?.ladder || []).find(rung => rung.id === relationship?.phase)?.title || '';
@@ -68,6 +67,7 @@ function unrecordedFields(state, settings) {
         add(Boolean(state?.relationship?.updatedAt) && !state?.relationship?.ladder?.length, 'relationship_update.ladder');
         add(Boolean(state?.relationship?.updatedAt) && !state?.relationship?.phase, 'relationship_update.phase');
         add(Boolean(state?.relationship?.updatedAt) && !state?.relationship?.nextStep, 'relationship_update.next_step');
+        add(Boolean(state?.relationship?.updatedAt) && !state?.relationship?.behavior, 'relationship_update.behavior');
     }
     return fields;
 }
@@ -94,7 +94,7 @@ function relationshipSchema(rebuild = false) {
         phase: 'Exact title of the latest step already taken',
         next_step: 'Nearest missing agreement or milestone, max 120 characters; empty if none',
         stage: 'Same title as phase',
-        behavior: 'Optional observed attitude, max 12 words / 100 characters; empty if unnecessary',
+        behavior: 'How this particular character behaves towards the user given the scale values, and what is particular about that conduct, max 280 characters',
         progress: 10, trust: 10, passion: 10, devotion: 10, attachment: 10,
     };
 }
@@ -111,7 +111,14 @@ function relationshipRules(rebuild = false) {
             + 'The ladder must not stop at the present day. After the rung they have actually reached, give 2 to 4 more that this relationship would plausibly pass through next, still untaken — they are possibilities, not a predicted destiny, and the nearest of them is the one the story is currently leaning towards. A ladder whose last rung is the current phase is wrong and useless: the whole point of the thing is to show what lies ahead. '
             + 'phase is the exact title of the latest step actually taken in the supplied story, never an aspiration. No change without evidence that its condition was met. '
             + 'next_step belongs to the ladder, not to the plot: it names what is still missing before the NEXT untaken rung counts as reached, and it must match that rung. If the next rung is "said it out loud", next_step is that one of them has to say it and the other has to answer — not what either of them is scheming to do with a letter. A next_step that reads as a summary of where the plot is heading is wrong, and so is one that no rung on the ladder corresponds to. One short clause, max 120 characters, no dialogue script, emotional essay or behavioral instructions. Return an empty string only when the ladder genuinely has no rung left ahead. When an old next_step is verbose or vague, replace it now.',
-        'stage repeats the title of the current step, never a second poetic label. behavior is optional: one observed attitude in at most 12 words / 100 characters, not instructions about how to speak, touch, feel or act. Return behavior="" when it adds nothing; replace old verbose behavioral scripts with an empty string or a short observation. '
+        'stage repeats the title of the current step, never a second poetic label. '
+            // Раньше это писало расширение: четыре готовые полосы по среднему
+            // баллу. Одинаковые числа у разных людей означают разное поведение,
+            // а таблицу в характер переводит только тот, кто читал историю.
+            // Прямой вопрос, а не арифметика: те же числа у другого человека
+            // дают другое поведение, и свести их в характер может только тот,
+            // кто прочёл карточку и историю.
+            + `behavior answers one question, in at most 280 characters: given the scale values you have just recorded, how does ${CHAR} behave towards ${USER}, and what is particular about that conduct? Answer it from this character — their temper, their history, their manners, everything the card and the story say about them — and not from the numbers in the abstract. Concrete conduct: what they say and what they hold back, how close they come, what they do and refuse to do for ${USER}. Where one scale runs far ahead of the others, that gap is usually the most telling thing about them. Never name the scales or quote the numbers. It describes a disposition, not an event, and covers ${CHAR} alone, never ${USER}. Rewrite it whenever the values move. Return behavior="" only while no scale has been scored yet. `
             + (rebuild
                 ? 'Metrics describe supported feelings and never authorize a step transition. Score all five from the supplied story as a whole, 0..100 each: what the two have actually been through together, not the temperature of the latest scene. Return every one of them — this answer replaces the recorded values outright, so an omitted metric is a lost one. '
                 : 'Metrics describe supported feelings, never authorize a step transition; ordinary scenes change them by 0..3. Return absolute values for changed metrics only. ')
@@ -423,8 +430,11 @@ function conditionLine(health) {
     return parts.length ? `${CHAR} now: ${parts.join('; ')}` : '';
 }
 
-function relationshipDisposition(relationship, trends = {}) {
-    const stance = promptDisposition(relationship, trends);
+function relationshipDisposition(relationship) {
+    // Пишет это анализ, а не расширение: перевод шкал в поведение зависит от
+    // того, кто такой персонаж, а расширение о нём ничего не знает. Считать его
+    // здесь значит выдать всем персонажам с одинаковыми числами одну манеру.
+    const stance = String(relationship?.behavior || '').trim();
     if (!stance) return [];
     // Одна и та же цифра в разных историях означает разное: близость у тех, кто
     // прошёл через вынужденный союз и чужой город, — не та же близость, что у
@@ -434,10 +444,10 @@ function relationshipDisposition(relationship, trends = {}) {
     const history = road.length > 1
         ? ` Read it against the road the two have actually travelled, which is what the levels were earned on: ${road.join(' → ')}.`
         : '';
-    // Первая фраза называет происхождение строки: это не запись о случившемся,
-    // а пересчёт накопленных метрик в поведение. Без этого модель читает её как
-    // ещё один факт сцены и пересказывает его вслух.
-    return [`How ${CHAR} is disposed towards ${USER}, read off the relationship levels Mnema has tracked so far. An estimate of how ${CHAR} would behave, not a record of anything that happened, and ${CHAR}'s side only: ${stance}${history}`];
+    // Простая фраза о том, как персонаж себя ведёт, плюс оговорка о её
+    // происхождении: без неё модель читает строку как факт сцены и
+    // пересказывает вслух.
+    return [`This is how ${CHAR} behaves towards ${USER} at the levels reached so far — a disposition of ${CHAR}'s, not a record of anything that happened: ${stance}${history}`];
 }
 
 export function buildMemoryInjection(state, settings) {
@@ -464,11 +474,7 @@ export function buildMemoryInjection(state, settings) {
         }
         if (current < 0 && known) values.push(`Latest relationship step taken: ${known}`);
         if (nextStep) values.push(`Missing agreement or milestone: ${nextStep}`);
-        // Наблюдение анализа о том, как {{char}} сейчас держится, — раньше оно
-        // доезжало только до плашки.
-        const attitude = String(memory.relationship.behavior || '').trim();
-        if (attitude) values.push(`How ${CHAR} currently carries themselves with ${USER}: ${attitude}`);
-        values.push(...relationshipDisposition(memory.relationship, state.relationship?.trends));
+        values.push(...relationshipDisposition(memory.relationship));
     }
     // Личное обязательство и событие мира требуют от модели разного: первое
     // герои выполняют или нарушают сами, второе происходит вокруг них. Без
@@ -505,7 +511,7 @@ export function buildMemoryInjection(state, settings) {
     const rules = [
         `Scene: keep place, time and both outfits consistent; change what ${USER} wears only if ${USER} or the story does. A new place gets one full description — layout, light, atmosphere, objects; an unchanged one gets none.`,
         memory.health ? `Condition: let tiredness, hunger or an injury show in ${CHAR}'s pacing, patience and physical ability. It never fixes itself — only food, rest or treatment that actually happens in the story.` : '',
-        memory.relationship ? `Relationship: the disposition above is Mnema's reading of the tracked levels — what those values mean for conduct, worked out for you so that you do not have to weigh the numbers yourself. Use it as ${CHAR}'s current calibration: it sets their guard, initiative, patience, what they offer unasked and what they keep back, and the scene is then written through it. Restating it is the one thing it is not for — never quote it, sum up the state of the bond, score it, or have anyone remark on how close the two have become; a reader should only be able to infer it from what ${CHAR} does. It is a baseline and not the last word: where the visible messages and the arc summaries in this chat hold something more recent or more particular — a quarrel, a betrayal just found out, a promise kept at a real cost — that governs the scene, and the level only says which way ${CHAR} leans once the story leaves it open. It covers ${CHAR} alone: never narrate, assign or resolve what ${USER} feels, decides or is ready for, and do not answer on their behalf. Preserve the established status. Do not skip a needed proposal, conversation or mutual agreement. Affection, flirting, kissing or sex alone do not make them a couple; being a couple does not imply engagement. When a transition fits the story, let ${CHAR} raise it naturally and leave ${USER} free to answer; never supply their consent or treat an unanswered proposal as accepted. The next milestone is a reminder, not a task for this reply or a required destination. Keep personality and behavior grounded in the character profile and scene: a high level is how the profile's own character shows warmth, never a different, softer person.` : '',
+        memory.relationship ? `Relationship: the disposition above was worked out for ${CHAR} in particular from the tracked levels, so that you do not have to weigh the numbers yourself. Use it as ${CHAR}'s current calibration: it sets their guard, initiative, patience, what they offer unasked and what they keep back, and the scene is then written through it. Restating it is the one thing it is not for — never quote it, sum up the state of the bond, score it, or have anyone remark on how close the two have become; a reader should only be able to infer it from what ${CHAR} does. It is a baseline and not the last word: where the visible messages and the arc summaries in this chat hold something more recent or more particular — a quarrel, a betrayal just found out, a promise kept at a real cost — that governs the scene, and the level only says which way ${CHAR} leans once the story leaves it open. It covers ${CHAR} alone: never narrate, assign or resolve what ${USER} feels, decides or is ready for, and do not answer on their behalf. Preserve the established status. Do not skip a needed proposal, conversation or mutual agreement. Affection, flirting, kissing or sex alone do not make them a couple; being a couple does not imply engagement. When a transition fits the story, let ${CHAR} raise it naturally and leave ${USER} free to answer; never supply their consent or treat an unanswered proposal as accepted. The next milestone is a reminder, not a task for this reply or a required destination. Keep personality and behavior grounded in the character profile and scene: a high level is how the profile's own character shows warmth, never a different, softer person.` : '',
         memory.calendar ? 'Plans: a possible direction, not a schedule and not a goal. May be postponed, changed or never reached; do not announce, remind of or resolve one unless the scene arrives there by itself.' : '',
         memory.secrets ? 'Secrets: what is hidden is private context only. Leaving it untouched for the whole reply is the normal outcome; no reveal, and no hint beyond what the character would plausibly let slip, without a story reason. What is already known to both is shared ground — speak of it openly when it fits, never re-hide it or reveal it a second time. Never invent a secret.' : '',
         memory.gallery ? 'Shared past: mention only if the scene raises it by itself.' : '',

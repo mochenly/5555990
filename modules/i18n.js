@@ -164,16 +164,8 @@ const EN = {
     'Модель не вернула ни одной ступени отношений': 'The model returned no relationship step at all',
     'Модель не оставила ни одной ступени впереди — нажмите пересборку ещё раз': 'The model left no step ahead — press rebuild again',
 
-    // ── Что шкалы означают в поведении (то же, что уходит в промпт) ─────────
+    // Заголовок переводим, сам текст — нет: его пишет анализ на языке истории.
     'Что это меняет в поведении': 'What this changes in behaviour',
-    'Держит {user} на расстоянии: о себе говорит скупо, сказанное проверяет и помогает там, где это ничего не стоит': 'Keeps {user} at arm\'s length: says little about themselves, checks what they are told, and helps where it costs nothing',
-    'Держится с {user} ровно, но без сближения: делится фактами, а не причинами, приходит, когда просят, и свою жизнь ни под что не перестраивает': 'Steady with {user} but not close: shares facts rather than reasons, shows up when asked, and rearranges nothing for them',
-    'Держится с {user} близко: говорит о своём прямо, ищет общества, задерживает взгляд и ставит чужую нужду выше собственного удобства': 'Close to {user}: speaks plainly about their own affairs, seeks their company, holds a look a beat too long, and puts their need ahead of mere convenience',
-    'Пускает {user} за все свои границы: не скрывает ничего важного, верит на слово, идёт на настоящие потери не раздумывая и тяжело переносит разлуку': 'Lets {user} inside every guard: hides nothing that matters, takes them at their word, accepts real losses without weighing them, and takes separation hard',
-    'сильнее прочего — {metric}': '{metric} runs ahead of the rest',
-    'слабее прочего — {metric}': '{metric} lags behind',
-    'в последнее время это растёт': 'lately it has been rising',
-    'в последнее время это идёт на убыль': 'lately it has been slipping',
     'Раздел отношений пересобран · ступеней: {n}': 'Relationship section rebuilt · steps: {n}',
 
     // ── Календарь ──────────────────────────────────────────────────────────

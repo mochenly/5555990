@@ -176,7 +176,6 @@ export function popupHtml() {
                                 <div id="mnema_relationship_metrics" class="mnema-relationship-metrics"></div>
                                 <div id="mnema_relationship_conduct" class="mnema-relationship-conduct" hidden>
                                     <small>Что это меняет в поведении</small>
-                                    <p id="mnema_relationship_stance" class="mnema-relationship-stance" hidden></p>
                                     <p id="mnema_relationship_behavior" class="mnema-relationship-behavior" hidden></p>
                                 </div>
                             </article>

@@ -277,7 +277,9 @@ export function normalizeRelationship(value) {
         phase: phaseIndex >= 0 ? ladder[phaseIndex].id : '',
         nextStep: String(source.nextStep ?? source.next_step ?? '').trim().slice(0, 120),
         stage: String(ladder[phaseIndex]?.title || source.stage || source.status || STAGE_UNSET).slice(0, 40),
-        behavior: String(source.behavior || '').trim().slice(0, 100),
+        // Не реплика и не заметка, а разбор того, что шкалы делают с поведением
+        // именно этого персонажа: в 100 символов он не укладывался.
+        behavior: String(source.behavior || '').trim().slice(0, 280),
         progress: clampPercent(source.progress),
         trust: clampPercent(source.trust),
         passion: clampPercent(source.passion),
