@@ -94,7 +94,7 @@ function relationshipSchema(rebuild = false) {
         phase: 'Exact title of the latest step already taken',
         next_step: 'Nearest missing agreement or milestone, max 120 characters; empty if none',
         stage: 'Same title as phase',
-        behavior: 'How this particular character behaves towards the user given the scale values, and what is particular about that conduct, max 280 characters',
+        behavior: 'How this particular character behaves towards the user given the scale values, in any scene rather than the current one, and what is particular about that conduct; 2-4 sentences, max 600 characters',
         progress: 10, trust: 10, passion: 10, devotion: 10, attachment: 10,
     };
 }
@@ -112,13 +112,15 @@ function relationshipRules(rebuild = false) {
             + 'phase is the exact title of the latest step actually taken in the supplied story, never an aspiration. No change without evidence that its condition was met. '
             + 'next_step belongs to the ladder, not to the plot: it names what is still missing before the NEXT untaken rung counts as reached, and it must match that rung. If the next rung is "said it out loud", next_step is that one of them has to say it and the other has to answer — not what either of them is scheming to do with a letter. A next_step that reads as a summary of where the plot is heading is wrong, and so is one that no rung on the ladder corresponds to. One short clause, max 120 characters, no dialogue script, emotional essay or behavioral instructions. Return an empty string only when the ladder genuinely has no rung left ahead. When an old next_step is verbose or vague, replace it now.',
         'stage repeats the title of the current step, never a second poetic label. '
-            // Раньше это писало расширение: четыре готовые полосы по среднему
-            // баллу. Одинаковые числа у разных людей означают разное поведение,
-            // а таблицу в характер переводит только тот, кто читал историю.
             // Прямой вопрос, а не арифметика: те же числа у другого человека
             // дают другое поведение, и свести их в характер может только тот,
             // кто прочёл карточку и историю.
-            + `behavior answers one question, in at most 280 characters: given the scale values you have just recorded, how does ${CHAR} behave towards ${USER}, and what is particular about that conduct? Answer it from this character — their temper, their history, their manners, everything the card and the story say about them — and not from the numbers in the abstract. Concrete conduct: what they say and what they hold back, how close they come, what they do and refuse to do for ${USER}. Where one scale runs far ahead of the others, that gap is usually the most telling thing about them. Never name the scales or quote the numbers. It describes a disposition, not an event, and covers ${CHAR} alone, never ${USER}. Rewrite it whenever the values move. Return behavior="" only while no scale has been scored yet. `
+            //
+            // Сцена здесь не при чём. Строка уходит в промпт как настройка, по
+            // которой пишется следующий ответ, — пересказ последних событий на
+            // этом месте переворачивает зависимость: поведение начинает
+            // следовать за уже случившимся вместо того, чтобы его задавать.
+            + `behavior answers one question, in 2 to 4 sentences and at most 600 characters: given the scale values you have just recorded, how does ${CHAR} behave towards ${USER}, and what is particular about that conduct? Answer it from this character — their temper, their history, their manners, everything the card and the story say about them — and not from the numbers in the abstract. Describe them as they now are with ${USER} in any scene at all, with no scene in front of you: what they habitually say and habitually hold back, how close they let ${USER} come, what they do and refuse to do for them, where their patience runs out. It is not a summary of the interval you were given, and not a record of anything that happened: name no event, no place, no recent quarrel or kindness, and do not begin with "after" or "now that". The story is what you read the values off; this line is what conduct those values call for from here on. Where one scale runs far ahead of the others, that gap is usually the most telling thing about them. Never name the scales or quote the numbers. It covers ${CHAR} alone, never ${USER}. Rewrite it whenever the values move. Return behavior="" only while no scale has been scored yet. `
             + (rebuild
                 ? 'Metrics describe supported feelings and never authorize a step transition. Score all five from the supplied story as a whole, 0..100 each: what the two have actually been through together, not the temperature of the latest scene. Return every one of them — this answer replaces the recorded values outright, so an omitted metric is a lost one. '
                 : 'Metrics describe supported feelings, never authorize a step transition; ordinary scenes change them by 0..3. Return absolute values for changed metrics only. ')
