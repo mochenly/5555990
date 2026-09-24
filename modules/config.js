@@ -65,11 +65,56 @@ export const isWorldPlan = plan => planKind(plan?.kind) === 'world';
 // и отдельно снимаем право решать за неё с примеров и с уже записанных
 // значений: в состояние подписи попадают и от самого расширения.
 //
+// Ни одного языка правило не называет, хотя раньше называло два для примера.
+// Больше в промптах расширения нет ни слова не по-английски, так что этот
+// пример был единственным упоминанием другого языка во всём запросе — и в
+// английской истории модель временами уходила отвечать именно на нём.
+//
 // Живёт здесь, рядом с isWorldPlan: правило нужно каждому сборщику промптов, а
 // импортировать ради него сборщики друг из друга значит завести цикл.
 export const LANGUAGE_RULE = 'Language of the answer: write every natural-language value — titles, names, summaries, notes, labels, descriptions — in the language of the supplied story messages, whatever language that is. '
     + 'Work it out from those messages alone. This instruction, the JSON keys and every example value are written in English as notation only and never indicate the output language; neither do values already present in the previous state, which may have been recorded by the extension itself rather than written in the story. '
-    + 'A Russian story is answered in Russian, an English one in English, and any other language in that language. Never translate the story into English, and never mix two languages in one answer. Keep JSON keys and enum codes exactly as specified, in English.';
+    + 'Whatever language the story is written in, the answer is written in that same one. Do not translate the story into another language, do not mix two languages in one answer, and do not switch language because a single line, a quoted phrase or a character name differs from the rest of the story. Keep JSON keys and enum codes exactly as specified, in English.';
+
+// Просить модель «определи язык истории сама» — значит отдавать ей решение,
+// которое расширение принимает надёжнее: текст истории у нас на руках, считать
+// его буквы дёшево, и никакая карточка персонажа на счёт не влияет. Модель же
+// в этом месте путает язык истории с языком героя, и русская по паспорту
+// девушка в английском отыгрыше уводит на русский весь раздел.
+//
+// Определяем только то, что действительно различимо: кириллица — русский,
+// латиница с английскими служебными словами — английский. Латиница без них
+// может оказаться любым из десятка языков, и называть её английским хуже, чем
+// не называть никак: тогда остаётся общее правило.
+const ENGLISH_MARKERS = /\b(?:the|and|of|to|in|that|was|with|he|she|her|his|they|for|not|but|had|you|it|from|were|would)\b/gi;
+const LANGUAGE_SAMPLE_LIMIT = 20000;
+const LANGUAGE_MIN_LETTERS = 200;
+
+export function storyLanguage(source) {
+    const sample = (Array.isArray(source) ? source : [source])
+        .map(item => typeof item === 'string' ? item : String(item?.text ?? item?.mes ?? item?.summary ?? ''))
+        .join('\n')
+        .slice(0, LANGUAGE_SAMPLE_LIMIT);
+    const cyrillic = (sample.match(/\p{Script=Cyrillic}/gu) || []).length;
+    const latin = (sample.match(/\p{Script=Latin}/gu) || []).length;
+    // Пара реплик — ещё не язык истории: на таком объёме приветствие на одном
+    // языке перевесит всё остальное.
+    if (cyrillic + latin < LANGUAGE_MIN_LETTERS) return '';
+    if (cyrillic > latin) return 'Russian';
+    const words = sample.split(/[^\p{L}']+/u).filter(Boolean).length;
+    const markers = (sample.match(ENGLISH_MARKERS) || []).length;
+    return words >= 40 && markers / words >= 0.08 ? 'English' : '';
+}
+
+// Язык назван прямо — и сразу перечислено всё, что его не решает: иначе модель
+// находит «она русская» в карточке и считает это указанием.
+export function languageRule(source) {
+    const language = storyLanguage(source);
+    if (!language) return LANGUAGE_RULE;
+    return `Language of the answer: write every natural-language value — titles, names, summaries, notes, labels, descriptions — in ${language}. `
+        + `The supplied story is written in ${language}, and that is the only thing deciding this. What language a character is said to speak, their nationality or origin, a line of dialogue quoted in another language, the language of these instructions, and any value already recorded in the previous state decide nothing here. `
+        + `Answer in ${language} even where the story quotes another language, and never mix two languages in one answer. Keep JSON keys and enum codes exactly as specified, in English.`;
+}
 
 export const RELATIONSHIP_LADDER_LIMIT = 14;
 export const RELATIONSHIP_RUNG_TITLE_LIMIT = 40;
