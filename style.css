@@ -2203,3 +2203,15 @@ html body #chat .mnema-arc-fold {
 .mnema-review small { display: block; opacity: 0.7; }
 .mnema-review-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .mnema-review-actions .menu_button { width: auto; margin: 0; padding: 4px 10px; font-size: 0.9em; }
+
+/* ---------- Персонажи ---------- */
+.mnema-cast-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; margin-top: 10px; }
+.mnema-cast { display: flex; flex-direction: column; gap: 6px; padding: 12px; }
+.mnema-cast header { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; align-items: start; }
+.mnema-cast header > i { color: var(--mnema-accent); margin-top: 2px; }
+.mnema-cast header strong { display: block; font-size: 12px; }
+.mnema-cast header small, .mnema-cast p { color: var(--mnema-muted); font-size: 10.5px; line-height: 1.45; margin: 0; }
+.mnema-cast-knows { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 10.5px; }
+.mnema-cast-knows > span { color: var(--mnema-muted); }
+.mnema-cast-knows em { font-style: normal; padding: 1px 7px; border-radius: 99px; border: 1px solid color-mix(in srgb, var(--mnema-accent) 35%, transparent); }
+.mnema-cast-knows em i { font-size: 8px; color: var(--mnema-accent); }

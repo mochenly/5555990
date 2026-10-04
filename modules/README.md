@@ -12,6 +12,7 @@
 - `agents.js` — agent registry, per-agent connection override and the session journal; `callAgent` is the only way agents reach the model.
 - `agents-ui.js` — the Agents tab: analysis mode, per-agent switches and connections, journal.
 - `reviewer.js` — the Editor agent: checks the newest reply against memory, marks contradictions under it and rewrites it as a new swipe with a one-off correction.
+- `cast.js` — supporting characters and which recorded secrets each knows: normalization, updates from the Knowledge keeper, who is present in the scene, the Cast tab.
 - `config.js` — identifiers, defaults and shared feature metadata.
 - `utils.js` — small DOM-safe helpers.
 

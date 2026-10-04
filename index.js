@@ -30,6 +30,7 @@ import { buildAnalysisPrompt as composeAnalysisPrompt, buildArcPrompt, buildBeha
 import { callAgent, onJournalChange } from './modules/agents.js';
 import { bindAgentEvents, renderAgentList, renderJournal } from './modules/agents-ui.js';
 import { createReviewer } from './modules/reviewer.js';
+import { applyCastUpdates } from './modules/cast.js';
 import { menuHtml, popupHtml } from './modules/template.js';
 import { applyCalendarUpdates, dateFromIso, formatCalendarDate, renderCalendar, syncCalendarDate } from './modules/calendar.js';
 import { fetchModels, parseJsonResponse, requestModel } from './modules/model-api.js';
@@ -618,6 +619,9 @@ function applyAnalysisState(chat, state, result, indices = null) {
     applyHealthUpdate(state, result.health_update || result.health, settings);
     applyRelationshipUpdate(state, result.relationship_update || result.relationship, settings);
     applySecretsUpdate(state, result.secrets_update || result.secrets, settings);
+    // После секретов: знания персонажей ссылаются на их названия, и тайна,
+    // заведённая в этом же интервале, уже должна быть среди записанных.
+    applyCastUpdates(state, result.cast_updates || result.cast, settings, clockIndex);
     applyGalleryUpdates(state, result.gallery_updates || result.gallery, settings, indices ? serializeMessages(chat, indices) : []);
 }
 
@@ -874,7 +878,9 @@ function updateArcInjection() {
     const arcs = active.length
         ? `<mnema_arcs>\n${active.map((arc, index) => `ARC ${index + 1}: ${arc.title}\n${arc.summary}`).join('\n\n')}\n</mnema_arcs>` : '';
     setExtensionPrompt(PROMPT_KEY, settings.enabled ? arcs : '', extension_prompt_types.IN_PROMPT, 0, false, extension_prompt_roles.SYSTEM);
-    const narrativeContext = settings.enabled ? buildMemoryInjection(state, settings) : '';
+    // Кто сейчас в сцене, Mnema узнаёт по последним репликам.
+    const recentText = chat.slice(-6).filter(message => message && !message.is_system && !message.extra?.mnema_arc_id).map(message => message.mes || '').join('\n');
+    const narrativeContext = settings.enabled ? buildMemoryInjection(state, settings, recentText) : '';
     // Инструкция для основной модели идёт в самый конец чата, сразу после
     // сообщения пользователя, иначе модель про метку забывает.
     setExtensionPrompt(

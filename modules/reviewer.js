@@ -36,7 +36,7 @@ function buildReviewPrompt({ state, settings, context, reply, earlier }) {
                 '- the place, the time of day or the date jumping with no transition, or time running backwards;',
                 '- clothing that changed with nobody changing it;',
                 '- a recorded injury or illness ignored, or healed with no treatment;',
-                `- a character acting on a secret they cannot know: check who each secret is hidden from and whether it was revealed to them;`,
+                `- a character acting on a secret they cannot know: check who each secret is hidden from, whether it was revealed to them, and which secrets each supporting character is recorded to know;`,
                 `- the relationship treated as a step it has not reached, for instance acting as a couple before they are one;`,
                 '- something from the past stated differently from how it happened;',
                 `- the reply deciding what ${user} says, does, feels or decides — the narrator must leave ${user} to the user;`,

@@ -2,6 +2,7 @@ import { secretRules } from './secrets.js';
 import { galleryEnabled } from './gallery-data.js';
 import { isWorldPlan, languageRule, RELATIONSHIP_LADDER_LIMIT } from './config.js';
 import { STAGE_UNSET } from './state.js';
+import { castEnabled, presentCast } from './cast.js';
 
 export const rungTitle = relationship => (relationship?.ladder || []).find(rung => rung.id === relationship?.phase)?.title || '';
 
@@ -33,6 +34,7 @@ export function memoryState(state, settings) {
         plans: state.calendar.plans.map(item => pick(item, ['title', 'date', 'time', 'details', 'kind'])),
     };
     if (settings.trackSecrets) result.secrets = Object.fromEntries(['revealed', 'unrevealed'].map(key => [key, state.secrets[key].map(item => pick(item, ['title', 'summary', 'owner', 'hiddenFrom']))]));
+    if (castEnabled(settings)) result.cast = (state.cast || []).map(member => pick(member, ['name', 'role', 'relation', 'knows']));
     if (settings.collectGallery) result.gallery = Object.fromEntries(['memories', 'items'].filter(key => galleryEnabled(settings, key === 'items' ? 'item' : 'memory')).map(key => [key, state.gallery[key].map(item => pick(item, ['title', 'summary']))]));
     return result;
 }
@@ -175,6 +177,9 @@ const ARC_BOUNDARY_RULE = 'Arc boundary: an arc is ONE completed stretch of a st
     + 'Set close_arc=true as soon as the thread the previous intervals were following reaches its settlement in this interval, even when the wider story obviously continues, and even when the arc ran for only a couple of intervals: most arcs are short. '
     + 'Holding an arc open while waiting for a grand or final resolution is the most common mistake here and is wrong — if you cannot name what is still unsettled in the thread, the arc is finished. '
     + 'Set close_arc=false only when this interval leaves the thread genuinely open: it pauses, changes scene or carries an unresolved question further. arc_reason names the thread and how it settled.';
+const CAST_RULE = 'Cast: supporting characters only — everyone except the main character and the user character. Record a person the story actually brings in, by name or by a fixed description such as "the innkeeper"; never invent one. Update an entry by its exact recorded name. role says who they are, relation says what they are to the protagonists, one short phrase each. '
+    + 'knows lists exact titles of recorded secrets this person knows. Add a title only when the story shows them learning it or the profiles establish that they know it; suspicion and hints are not knowledge. Titles not among the recorded secrets are ignored, so never use this to create a secret. Repeating an entry keeps what it already knows; you do not need to list it again. '
+    + 'status="gone" removes a person who has left the story for good or died. Return only entries that are new or changed; secrets in Previous state are for reference only and are updated elsewhere.';
 const EVENTS_RULE = 'Events: preserve actions, causes, consequences, promises and unresolved threads in event_summary for later arc summarization.';
 
 // Границу арки нельзя увидеть по одному интервалу. Без конспектов уже
@@ -201,7 +206,7 @@ function arcContext(state) {
 
 // Разделы памяти, которые разбирают специалисты. Имена совпадают с ключами
 // memoryState, поэтому снимок состояния режется по ним же.
-export const ANALYSIS_SECTIONS = Object.freeze(['world', 'calendar', 'health', 'relationship', 'secrets', 'gallery']);
+export const ANALYSIS_SECTIONS = Object.freeze(['world', 'calendar', 'health', 'relationship', 'secrets', 'cast', 'gallery']);
 const SECTION_OF_FIELD = { world_update: 'world', calendar_updates: 'calendar', health_update: 'health', relationship_update: 'relationship' };
 const fieldSection = field => SECTION_OF_FIELD[String(field).split(/[ .]/)[0]] || null;
 
@@ -211,6 +216,7 @@ export function enabledSections(settings) {
         || (section === 'health' && settings.trackHealth)
         || (section === 'relationship' && settings.trackRelationships)
         || (section === 'secrets' && settings.trackSecrets)
+        || (section === 'cast' && castEnabled(settings))
         || (section === 'gallery' && (galleryEnabled(settings, 'memory', true) || galleryEnabled(settings, 'item', true))));
 }
 
@@ -259,6 +265,10 @@ export function buildAnalysisPrompt({ state, settings, characterName, userName, 
         schema.secrets_update = { reveal: ['Existing title'], new_unrevealed: [{ title: 'Stable title', summary: 'Fact and who knows it', owner: 'char', hidden_from: 'Who must not learn it' }], new_revealed: [{ title: 'Stable title', summary: 'Fact and who learned it', owner: 'user', hidden_from: 'Who still does not know it' }] };
         instructions.push(secretRules(state, settings) + ' During analysis, explicitly inspect BOTH participant cards (description, personality, scenario and persona description) AND narration for established concealed facts. A hidden identity, concealed past, private obligation or other explicit secret in a card is already a valid background fact even if nobody has mentioned it in dialogue. Record it as unrevealed unless the story establishes disclosure; reading it in a card does not mean the other character knows it. Do not treat ordinary traits or possible future plot hooks as secrets. Only record explicitly established concealed facts. Do not infer secrecy from a dramatic scene or invent hidden motives. Leave secrets_update absent when nothing qualifies, even if the section is empty. new_revealed is only for an established secret actually disclosed to both protagonists, never ordinary shared events. Use reveal with the exact existing title only when the secret actually becomes known to both; hints and suspicion are not disclosure. Disclosure between the two protagonists does not make a secret public: keep hidden_from naming everyone else who still does not know. When the circle of people who know changes — someone else finds out, or it becomes common knowledge — repeat the existing title in new_unrevealed or new_revealed with the updated hidden_from.');
     }
+    if (sections && wants('cast') && castEnabled(settings)) {
+        schema.cast_updates = [{ name: 'Name as the story uses it', role: 'Who they are, one phrase', relation: 'Their tie to the protagonists, one phrase', knows: ['Exact title of a recorded secret they know'], status: 'active' }];
+        instructions.push(CAST_RULE);
+    }
     if (sections && wants('gallery') && (galleryEnabled(settings, 'memory', true) || galleryEnabled(settings, 'item', true))) {
         const entry = { title: 'Title', summary: 'Brief factual evidence and why it matters' };
         schema.gallery_updates = {};
@@ -267,7 +277,10 @@ export function buildAnalysisPrompt({ state, settings, characterName, userName, 
         instructions.push('Gallery: rare significant memories and concrete physical keepsakes; at most two new entries total, without duplicates. Return short seeds only; first-person recollections and visual prompts are generated separately when the user opens an entry.');
     }
     const projection = sections ? memoryState(state, settings) : {};
-    const previous = only ? Object.fromEntries(Object.entries(projection).filter(([key]) => only.includes(key))) : projection;
+    // Хранителю знаний нужны названия тайн, чтобы отмечать, кто их знает;
+    // сами тайны ведёт не он.
+    const visible = only ? [...only, ...(only.includes('cast') ? ['secrets'] : [])] : null;
+    const previous = visible ? Object.fromEntries(Object.entries(projection).filter(([key]) => visible.includes(key))) : projection;
 
     return [
         { role: 'system', content: 'You are Mnema, the continuity and long-term memory editor of a roleplay story. Analyze the supplied history using established state and participant profiles. Profiles establish background facts, including explicit secrets and the starting story date; they are not proof that a proposed event or disclosure occurred. Actual story events take precedence. Record supported facts; do not continue the story. '
@@ -305,6 +318,7 @@ const SECTION_SCOPE = {
     health: 'the main character\'s hunger, tiredness, mood, injuries or illness',
     relationship: 'anything that moves the relationship between the two: trust, closeness, desire, devotion, a step in the relationship taken or missed',
     secrets: 'a concealed truth established, someone new finding it out, or its disclosure',
+    cast: 'a supporting character — anyone but the two protagonists — appearing for the first time, changing their role or tie to the protagonists, learning a recorded secret, or leaving the story',
     gallery: 'a moment significant enough to keep as a memory, or a physical keepsake given or kept',
 };
 
@@ -322,6 +336,7 @@ export function buildRouterPrompt({ state, settings, characterName, userName, me
         ...(settings.trackHealth ? { injuries: (state?.health?.injuries || []).map(item => item.name) } : {}),
         ...(settings.trackRelationships ? { relationship_step: rungTitle(relationship) || undefined } : {}),
         ...(settings.trackSecrets ? { secrets: [...(state?.secrets?.unrevealed || []), ...(state?.secrets?.revealed || [])].map(secret => secret.title) } : {}),
+        ...(castEnabled(settings) ? { people: (state?.cast || []).map(member => member.name) } : {}),
     };
     const schema = { event_summary: 'Concise factual summary of this interval', ...(detectArcEnd ? { close_arc: false, arc_reason: 'Reason, only when closing' } : {}), sections: ['world'] };
     return [
@@ -566,7 +581,7 @@ function relationshipDisposition(relationship) {
     return [`Direction for how ${CHAR} conducts themself towards ${USER} at the levels reached so far — worked out from ${CHAR}'s own character, not a record of anything that happened: ${stance}${history}`];
 }
 
-export function buildMemoryInjection(state, settings) {
+export function buildMemoryInjection(state, settings, recentText = '') {
     if (!state || !settings.enabled) return '';
     const memory = memoryState(state, settings);
     const world = memory.world;
@@ -617,6 +632,13 @@ export function buildMemoryInjection(state, settings) {
             values.push(`${secret.owner === 'world' ? 'Hidden world truth (not automatically known to either protagonist)' : `Hidden by ${secret.owner === 'user' ? USER : CHAR}`}: ${line(secret)}`);
         }
     }
+    // Только те, кого упоминают последние сообщения: знания отсутствующих
+    // ответу не нужны, а весь список раздувал бы промпт.
+    const present = memory.cast ? presentCast(state.cast, recentText) : [];
+    for (const member of present) {
+        const who = [member.role, member.relation].filter(Boolean).join('; ');
+        values.push(`${member.name}${who ? ` (${who})` : ''} — ${member.knows.length ? `knows: ${member.knows.join('; ')}` : 'knows none of the recorded secrets'}`);
+    }
     if (memory.gallery) {
         // Галерея растёт весь чат, а в подсказке нужны свежие — остальное
         // читается в попапе.
@@ -630,6 +652,7 @@ export function buildMemoryInjection(state, settings) {
         memory.relationship ? `Relationship: the disposition above was worked out for ${CHAR} in particular from the tracked levels, so that you do not have to weigh the numbers yourself. Use it as ${CHAR}'s current calibration: it sets their guard, initiative, patience, what they offer unasked and what they keep back, and the scene is then written through it. Restating it is the one thing it is not for — never quote it, sum up the state of the bond, score it, or have anyone remark on how close the two have become; a reader should only be able to infer it from what ${CHAR} does. It is a baseline and not the last word: where the visible messages and the arc summaries in this chat hold something more recent or more particular — a quarrel, a betrayal just found out, a promise kept at a real cost — that governs the scene, and the level only says which way ${CHAR} leans once the story leaves it open. It covers ${CHAR} alone: never narrate, assign or resolve what ${USER} feels, decides or is ready for, and do not answer on their behalf. Preserve the established status. Do not skip a needed proposal, conversation or mutual agreement. Affection, flirting, kissing or sex alone do not make them a couple; being a couple does not imply engagement. When a transition fits the story, let ${CHAR} raise it naturally and leave ${USER} free to answer; never supply their consent or treat an unanswered proposal as accepted. The next milestone is a reminder, not a task for this reply or a required destination. Keep personality and behavior grounded in the character profile and scene: a high level is how the profile's own character shows warmth, never a different, softer person.` : '',
         memory.calendar ? 'Plans: a possible direction, not a schedule and not a goal. May be postponed, changed or never reached; do not announce, remind of or resolve one unless the scene arrives there by itself.' : '',
         memory.secrets ? 'Secrets: what is hidden is private context only. Leaving it untouched for the whole reply is the normal outcome; no reveal, and no hint beyond what the character would plausibly let slip, without a story reason. What is already known to both is shared ground between the two of them only — they may speak of it openly between themselves, never re-hide it or reveal it a second time, but it is not public: anyone it is still hidden from does not know it, and nobody else learns it unless the story shows how. Never invent a secret.' : '',
+        present.length ? 'Supporting characters: each of them knows exactly the recorded secrets listed for them and none of the others, however natural it would be for them to guess; nobody learns a secret in this reply unless the reply shows how.' : '',
         memory.gallery ? 'Shared past: mention only if the scene raises it by itself.' : '',
     ].filter(Boolean);
 

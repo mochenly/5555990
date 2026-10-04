@@ -1,4 +1,5 @@
 import { sameSecret, secretSlots, secretKey } from './secrets.js';
+import { normalizeCast } from './cast.js';
 import { getContext } from '/scripts/extensions.js';
 import { getCurrentChatId } from '/script.js';
 import { RELATIONSHIP_LADDER_LIMIT, RELATIONSHIP_METRICS, RELATIONSHIP_RUNG_NOTE_LIMIT, RELATIONSHIP_RUNG_TITLE_LIMIT, STATE_KEY } from './config.js';
@@ -22,6 +23,7 @@ export function createState(chat) {
         health: { satiety: null, energy: null, mood: null, injuries: [] },
         relationship: { ladder: [], phase: '', nextStep: '', stage: STAGE_UNSET, behavior: '', progress: 0, trust: 0, passion: 0, devotion: 0, attachment: 0, trends: {}, updatedAt: null },
         gallery: { memories: [], items: [] },
+        cast: [],
         world: { location: '', description: '', characterOutfit: '', userOutfit: '', indoor: null, clock: '', clockIndex: null, timeOfDay: '', weather: '', temperature: null, updatedAt: null },
     };
 }
@@ -52,6 +54,7 @@ export function normalizeState(state, chat) {
     state.health.mood = state.health.mood && typeof state.health.mood === 'object' ? state.health.mood : null;
     state.health.injuries = Array.isArray(state.health.injuries) ? state.health.injuries : [];
     state.relationship = normalizeRelationship(state.relationship);
+    state.cast = normalizeCast(state.cast);
     state.gallery ??= {};
     state.gallery.memories = normalizeGalleryEntries(state.gallery.memories, 'memory');
     state.gallery.items = normalizeGalleryEntries(state.gallery.items, 'item');
@@ -102,6 +105,7 @@ export function createSnapshot(state) {
             plans: structuredClone(state.calendar.plans),
         },
         secrets: structuredClone(state.secrets),
+        cast: structuredClone(state.cast || []),
         gallery: { memories: lightGallery(state.gallery.memories), items: lightGallery(state.gallery.items) },
     };
 }
@@ -151,6 +155,8 @@ function applySnapshot(state, snapshot, chat) {
     state.relationship = structuredClone(snapshot.relationship);
     state.calendar = { ...state.calendar, ...structuredClone(snapshot.calendar) };
     state.secrets = structuredClone(snapshot.secrets);
+    // Снимки до раздела персонажей его не знают: тогда оставляем текущий.
+    if (Array.isArray(snapshot.cast)) state.cast = structuredClone(snapshot.cast);
     state.gallery = { memories: restore(snapshot.gallery?.memories), items: restore(snapshot.gallery?.items) };
 }
 

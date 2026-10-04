@@ -2,6 +2,7 @@ import { MENU_BUTTON_ID, POPUP_ID } from './config.js';
 import { infoblockThemesHtml } from './infoblock-themes.js';
 import { gallerySettingsHtml } from './gallery-settings.js';
 import { agentsPanelHtml } from './agents-ui.js';
+import { castPanelHtml } from './cast.js';
 
 export function menuHtml() {
     return `
@@ -33,6 +34,7 @@ export function popupHtml() {
                         <div class="mnema-sidebar-label">Статус</div>
                         <button class="mnema-tab-btn" data-mnema-tab="world" title="Мир"><span class="mnema-tab-ornament">✦</span><i class="fa-solid fa-earth-europe"></i><span class="mnema-tab-label">Мир</span></button>
                         <button class="mnema-tab-btn" data-mnema-tab="relationships" title="Отношения"><span class="mnema-tab-ornament">✦</span><i class="fa-solid fa-heart"></i><span class="mnema-tab-label">Отношения</span></button>
+                        <button class="mnema-tab-btn" data-mnema-tab="cast" title="Персонажи"><span class="mnema-tab-ornament">✦</span><i class="fa-solid fa-people-group"></i><span class="mnema-tab-label">Персонажи</span></button>
                         <button class="mnema-tab-btn" data-mnema-tab="calendar" title="Календарь"><span class="mnema-tab-ornament">✦</span><i class="fa-regular fa-calendar"></i><span class="mnema-tab-label">Календарь</span><span id="mnema_calendar_badge" class="mnema-tab-badge" hidden></span></button>
                         <button class="mnema-tab-btn" data-mnema-tab="health" title="Здоровье"><span class="mnema-tab-ornament">✦</span><i class="fa-solid fa-notes-medical"></i><span class="mnema-tab-label">Здоровье</span><span id="mnema_health_badge" class="mnema-tab-badge critical" hidden>!</span></button>
                         <div class="mnema-sidebar-label">Техническое</div>
@@ -267,6 +269,7 @@ export function popupHtml() {
                                 <div class="mnema-manual-progress-track"><i id="mnema_manual_progress_fill"></i></div>
                             </div>
                         </section>
+                        ${castPanelHtml()}
                         ${agentsPanelHtml()}
                         <section id="mnema_settings" class="mnema-tab-panel" data-mnema-panel="settings">
                             <div class="mnema-tab-title"><span>✦</span> Настройки</div>

@@ -18,10 +18,12 @@ const SECTIONS = {
     calendar: { title: 'Календарь', fields: [field('currentDate', 'Сюжетная дата', 'date')], lists: [{ key: 'plans', title: 'Планы', fields: [field('title', 'Название'), field('kind', 'Род записи', 'select', [['personal', 'Личный план героев'], ['world', 'Событие мира']]), field('date', 'Дата', 'date'), field('time', 'Время', 'time'), field('details', 'Подробности', 'textarea')] }, { key: 'birthdays', title: 'Дни рождения', fields: [field('person', 'Имя'), field('monthDay', 'Месяц-день, например 03-08'), field('note', 'Заметка', 'textarea')] }] },
     secrets: { title: 'Секреты', lists: [{ key: 'entries', title: 'Секреты', fields: [field('title', 'Название'), field('summary', 'Содержание и кто знает', 'textarea'), field('hiddenFrom', 'От кого скрыт'), field('owner', 'Чей секрет', 'select', [['char', 'Персонажа'], ['user', 'Персоны'], ['world', 'Мира']]), field('revealed', 'Статус', 'select', [['false', 'Не раскрыт'], ['true', 'Раскрыт']])] }] },
     gallery: { title: 'Галерея', lists: ['memories', 'items'].map(key => ({ key, title: key === 'items' ? 'Предметы' : 'Воспоминания', fields: [field('title', 'Название'), field('summary', 'Факт для памяти', 'textarea'), field('detail', 'Личное воспоминание', 'textarea'), field('imagePrompt', 'Визуальный промпт', 'textarea'), field('aspectRatio', 'Пропорции'), field('imageUrl', 'Путь или URL изображения')] })) },
+    // knows в форме — по названию тайны на строку, в состоянии — массив.
+    cast: { title: 'Персонажи', lists: [{ key: 'entries', title: 'Второстепенные персонажи', fields: [field('name', 'Имя'), field('role', 'Кто это'), field('relation', 'Кем приходится героям'), field('knows', 'Какие тайны знает — по названию на строку', 'textarea')] }] },
     pending: { title: 'Заметки текущей арки', lists: [{ key: 'eventNotes', title: 'Конспекты интервалов', fixed: true, fields: [field('summary', 'Конспект', 'textarea'), field('arcReason', 'Причина завершения', 'textarea')] }] },
     arcs: { title: 'Арки', lists: [{ key: 'entries', title: 'Сводки арок', fixed: true, fields: [field('title', 'Название'), field('summary', 'Конспект', 'textarea')] }] },
 };
-const TAB_SECTIONS = { world: 'world', relationships: 'relationship', health: 'health', calendar: 'calendar', secrets: 'secrets', gallery: 'gallery', memories: 'pending', summaries: 'arcs' };
+const TAB_SECTIONS = { world: 'world', relationships: 'relationship', health: 'health', calendar: 'calendar', secrets: 'secrets', cast: 'cast', gallery: 'gallery', memories: 'pending', summaries: 'arcs' };
 const get = (object, path) => path.split('.').reduce((value, key) => value?.[key], object);
 function set(object, path, value) {
     const keys = path.split('.');
@@ -48,16 +50,16 @@ export function createSectionEditor({ getSettings, getState, isBusy, onSaved }) 
     }
     function renderList(list) {
         const { section, draft, owner, expanded } = session;
-        const compact = ['arcs', 'pending', 'secrets', 'calendar'].includes(section);
+        const compact = ['arcs', 'pending', 'secrets', 'calendar', 'cast'].includes(section);
         const rows = (draft[list.key] || []).map((item, index) => {
             if (section === 'secrets' && (item.owner || 'char') !== owner) return '';
             const token = list.key + ':' + index;
-            const title = item.title || item.person || (section === 'pending' ? 'Конспект #' + (item.range?.[0] ?? index + 1) + '–' + (item.range?.[1] ?? index + 1) : list.key === 'plans' ? 'Новый план' : list.key === 'birthdays' ? 'Новый день рождения' : 'Новая запись');
+            const title = item.title || item.person || item.name || (section === 'pending' ? 'Конспект #' + (item.range?.[0] ?? index + 1) + '–' + (item.range?.[1] ?? index + 1) : list.key === 'plans' ? 'Новый план' : list.key === 'birthdays' ? 'Новый день рождения' : 'Новая запись');
             const preview = section === 'calendar'
                 ? list.key === 'birthdays'
                     ? (item.monthDay ? item.monthDay.split('-').reverse().join('.') : 'Дата не указана')
                     : [item.date ? item.date.split('-').reverse().join('.') : 'Без даты', item.time].filter(Boolean).join(' · ')
-                : String(item.summary || '').replace(/\s+/g, ' ').slice(0, 100);
+                : String(item.summary || item.role || '').replace(/\s+/g, ' ').slice(0, 100);
             const fields = list.fields.filter(def => section !== 'secrets' || def.key !== 'owner');
             const body = fields.map(def => inputHtml(def, get(item, def.key), list.key, index)).join('')
                 + (list.fixed ? '' : `<button class="menu_button" type="button" data-edit-remove="${list.key}" data-index="${index}">Удалить запись</button>`);
@@ -89,7 +91,7 @@ export function createSectionEditor({ getSettings, getState, isBusy, onSaved }) 
         const state = session.state;
         session.section = section;
         session.original = JSON.stringify(state[section]);
-        session.draft = structuredClone(section === 'arcs' ? { entries: state.arcs } : section === 'secrets' ? { entries: [...state.secrets.unrevealed.map(item => ({ ...item, revealed: false })), ...state.secrets.revealed.map(item => ({ ...item, revealed: true }))] } : state[section]);
+        session.draft = structuredClone(section === 'arcs' ? { entries: state.arcs } : section === 'cast' ? { entries: (state.cast || []).map(member => ({ ...member, knows: (member.knows || []).join('\n') })) } : section === 'secrets' ? { entries: [...state.secrets.unrevealed.map(item => ({ ...item, revealed: false })), ...state.secrets.revealed.map(item => ({ ...item, revealed: true }))] } : state[section]);
         session.dirty = false;
         session.owner = SECRET_OWNERS.includes(target.owner) ? target.owner : 'user';
         session.expanded = new Set();
@@ -123,6 +125,7 @@ export function createSectionEditor({ getSettings, getState, isBusy, onSaved }) 
             }
         }
         if (section === 'arcs') value = draft.entries;
+        if (section === 'cast') value = draft.entries.map(member => ({ ...member, knows: String(member.knows || '').split('\n').map(title => title.trim()).filter(Boolean) }));
         if (section === 'world' || section === 'relationship') value.updatedAt = new Date().toISOString();
         // Правка руками — самый свежий источник времени: помечаем её концом
         // чата, иначе отставший анализ перебьёт только что выставленные часы.
