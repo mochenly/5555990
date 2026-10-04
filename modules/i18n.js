@@ -117,6 +117,7 @@ const EN = {
     'В чате пока нет сообщений.': 'No messages in this chat yet.',
     'До следующей проверки: {n}': 'Next check in {n}',
     '{n}% общего прогресса': '{n}% of overall progress',
+    '{n}% общего прогресса · дальше: {next}': '{n}% of overall progress · next: {next}',
 
     // ── Секреты ────────────────────────────────────────────────────────────
     'Ваши тайны — вы их и так знаете': 'Your own secrets — you know them anyway',
@@ -314,7 +315,7 @@ const EN = {
     'Буфер в токенах': 'Buffer in tokens',
     'То же, но хвост меряется токенами. Если заданы оба буфера, действует более длинный': 'The same, but the tail is measured in tokens. If both buffers are set, the longer one applies',
     'Последние сообщения не попадают в арку и не скрываются: конспекты по ним пишутся, а арка закрывается, только когда её конец уйдёт старше буфера': 'The latest messages never go into an arc and stay visible: notes are still written for them, and an arc closes only once its end is older than the buffer',
-    '0 — без буфера': '0 - no buffer',
+    '0 — без буфера': '0 — no buffer',
     'Максимум отдельных арок': 'Maximum separate arcs',
     'Когда арок становится больше, самые старые сливаются в одно большое саммари': 'When there are more, the oldest are merged into one large summary',
     'Ранняя история': 'Early history',
