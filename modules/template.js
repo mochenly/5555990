@@ -1,6 +1,7 @@
 import { MENU_BUTTON_ID, POPUP_ID } from './config.js';
 import { infoblockThemesHtml } from './infoblock-themes.js';
 import { gallerySettingsHtml } from './gallery-settings.js';
+import { debugPanelHtml } from './debug-log.js';
 
 export function menuHtml() {
     return `
@@ -319,6 +320,7 @@ export function popupHtml() {
                                 </div>
                                 <button id="mnema_test_connection" class="menu_button" type="button"><i class="fa-solid fa-plug"></i> Проверить подключение</button>
                             </div>
+                            ${debugPanelHtml()}
                         </section>
                     </main>
                 </div>

@@ -114,7 +114,7 @@ export function createFocusController({ getState, getSettings, onChanged, isProc
                 });
             // Лестница с заметками к каждой ступени в ответ не укладывается в
             // бюджет остальных кнопок.
-            const result = parseJsonResponse(await requestModel(messages, settings, relationship ? 3000 : 1600));
+            const result = parseJsonResponse(await requestModel(messages, settings, relationship ? 3000 : 1600, `focus:${kind}`));
             if (!current()) return;
             // Откат держим наготове: раздел уже изменён, а saveChat ещё может
             // упасть — иначе в памяти осталось бы то, чего нет в файле чата.

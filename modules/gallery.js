@@ -49,7 +49,7 @@ export function createGalleryController({ getState, getSettings, images, renderG
         redraw();
         try {
             const messages = buildGalleryPrompt({ entry, participants: participantContext(context), messages: gallerySceneMessages(context.chat, settings.galleryContext), titles: state.gallery[key].filter(item => item.id !== id).map(item => item.title) });
-            const result = parseJsonResponse(await requestModel(messages, settings, 3200));
+            const result = parseJsonResponse(await requestModel(messages, settings, 3200, 'gallery'));
             if (!current()) return;
             if (typeof result.detail !== 'string' || !result.detail.trim() || typeof result.image_prompt !== 'string' || !result.image_prompt.trim() || (!id && !String(result.title || '').trim())) throw new Error('Модель не вернула текст воспоминания или визуальный промпт');
             const draft = { ...entry, title: id ? entry.title : String(result.title).trim().slice(0, 120), summary: String(result.summary || entry.summary || '').trim().slice(0, 1200), detail: result.detail.trim().slice(0, 20000), imagePrompt: result.image_prompt.trim().slice(0, 8000), aspectRatio: ['3:2', '4:3', '16:9', '2:3'].includes(result.aspect_ratio) ? result.aspect_ratio : '4:3', createdAt: entry.createdAt || new Date().toISOString() };

@@ -9,6 +9,7 @@
 - `state.js` — chat metadata persistence, normalization and sparse section updates.
 - `analysis.js` — participant profiles, message selection, manual arc validation and rebuilding helpers.
 - `model-api.js` — Connection Manager and manual Extra API transport.
+- `debug-log.js` — session debug log: captures Mnema console output, notifications, model requests and uncaught errors from its own files; renders the settings panel and exports a report with the API key removed.
 - `config.js` — identifiers, defaults and shared feature metadata.
 - `utils.js` — small DOM-safe helpers.
 

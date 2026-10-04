@@ -21,6 +21,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
     arcLimit: 3,
     // Только вид: сводки остаются в чате и уходят в промпт.
     hideArcSummaries: false,
+    // Журнал отладки: писать ли промпты и ответы модели целиком.
+    debugPrompts: false,
     connectionMode: 'profile',
     profileId: '',
     apiUrl: '',
