@@ -6,7 +6,7 @@ import { t } from './i18n.js';
 export function agentsPanelHtml() {
     return `<section class="mnema-tab-panel" data-mnema-panel="agents">
         <div class="mnema-tab-title"><span>✦</span> Агенты</div>
-        <div class="mnema-settings-section mnema-glass-card">
+        <div class="mnema-settings-section mnema-glass-card mnema-compact-card">
             <h4>Разбор интервала</h4>
             <label class="mnema-field">Режим анализа<select id="mnema_analysis_mode" class="text_pole">
                 <option value="agents">Агенты: распорядитель и специалисты</option>
@@ -14,9 +14,9 @@ export function agentsPanelHtml() {
             </select></label>
             <p class="mnema-hint">Агенты: распорядитель читает интервал и зовёт только тех специалистов, чьи разделы задеты; каждый видит лишь свой раздел. Тихий интервал стоит один короткий запрос, насыщенный — несколько параллельных. Один общий запрос — прежний режим: всё за один вызов.</p>
         </div>
-        <p class="mnema-hint">Нажмите на агента, чтобы открыть его настройки и подключение.</p>
+        <p class="mnema-hint mnema-agent-list-hint">Нажмите на агента, чтобы открыть его настройки и подключение.</p>
         <div id="mnema_agent_list" class="mnema-agent-list"></div>
-        <div class="mnema-settings-section mnema-glass-card">
+        <div class="mnema-settings-section mnema-glass-card mnema-compact-card">
             <div class="mnema-section-head"><h4>Журнал</h4><span id="mnema_journal_total" class="mnema-journal-total"></span><button type="button" id="mnema_journal_clear" class="mnema-section-edit" title="Очистить журнал" aria-label="Очистить журнал"><i class="fa-solid fa-broom"></i></button></div>
             <p class="mnema-hint">Вызовы агентов за эту сессию. Токены оценены грубо, по длине текста.</p>
             <div id="mnema_agent_journal" class="mnema-journal"></div>
@@ -38,6 +38,12 @@ function statusBadge(agent, enabled) {
 function connectionChip(settings, agent, profiles) {
     const { mode, text } = agentConnectionLabel(settings, agent.id, profiles);
     if (!mode) return '';
+    // Своё подключение выбрано, но не доделано: запросы агента упадут, и
+    // это должно быть видно, не раскрывая карточку.
+    if (!text) {
+        const problem = t(mode === 'profile' ? 'профиль не выбран' : 'модель не указана');
+        return `<span class="mnema-agent-chip warn" title="${escapeHtml(problem)}"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>${escapeHtml(problem)}</span>`;
+    }
     const icon = mode === 'profile' ? 'fa-plug' : 'fa-key';
     return `<span class="mnema-agent-chip" title="${escapeHtml(t(mode === 'profile' ? 'Свой профиль' : 'Своё подключение'))}"><i class="fa-solid ${icon}" aria-hidden="true"></i>${escapeHtml(text)}</span>`;
 }

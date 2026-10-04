@@ -77,9 +77,9 @@ export function agentConnectionLabel(settings, id, profiles = []) {
     const resolved = agentSettings(settings, id);
     if (mode === 'profile') {
         const profile = profiles.find(item => item.id === resolved.profileId);
-        return { mode, text: profile?.name || profile?.model || resolved.profileId || '—' };
+        return { mode, text: profile?.name || profile?.model || resolved.profileId || '' };
     }
-    if (mode === 'manual') return { mode, text: resolved.model || '—' };
+    if (mode === 'manual') return { mode, text: String(resolved.model || '').trim() };
     return { mode, text: '' };
 }
 

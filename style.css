@@ -2170,22 +2170,28 @@ html body #chat .mnema-arc-fold {
     .mnema-ib[data-ib-theme] *, .mnema-ib-theme-card { transition: none !important; animation: none !important; }
 }
 /* ---------- Агенты ---------- */
-.mnema-agent-list { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 12px; }
+.mnema-agent-list { display: flex; flex-direction: column; gap: 8px; margin: 0 0 20px; }
 .mnema-agent { padding: 0; overflow: hidden; transition: border-color 160ms ease; }
 .mnema-agent.disabled > summary { opacity: 0.6; }
 .mnema-agent[open] { border-color: color-mix(in srgb, var(--mnema-accent) 40%, transparent); }
-.mnema-agent > summary { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto 14px; gap: 10px; align-items: center; padding: 10px 12px; cursor: pointer; list-style: none; }
+/* Flex, а не сетка: у агента без своего подключения плашки нет, и в сетке
+   статус с шевроном съезжали на колонку. Здесь шеврон всегда у края. */
+.mnema-agent > summary { display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; list-style: none; }
 .mnema-agent > summary::-webkit-details-marker { display: none; }
 .mnema-agent > summary:hover { background: color-mix(in srgb, var(--mnema-accent) 6%, transparent); }
-.mnema-agent-icon { color: var(--mnema-accent); font-size: 15px; text-align: center; }
-.mnema-agent-name { min-width: 0; }
+.mnema-agent-icon { flex: 0 0 22px; color: var(--mnema-accent); font-size: 15px; text-align: center; }
+.mnema-agent-name { flex: 1 1 auto; min-width: 0; }
 .mnema-agent-name strong { display: block; font-size: 12px; }
 .mnema-agent-name small { display: block; color: var(--mnema-muted); font-size: 10.5px; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mnema-agent[open] .mnema-agent-name small { white-space: normal; }
-.mnema-agent-chevron { color: var(--mnema-muted); font-size: 11px; transition: transform 160ms ease; }
+.mnema-agent-chevron { flex: 0 0 14px; color: var(--mnema-muted); font-size: 11px; text-align: center; transition: transform 160ms ease; }
+.mnema-agent-badge, .mnema-agent-chip { flex: 0 0 auto; }
 .mnema-agent[open] .mnema-agent-chevron { transform: rotate(180deg); }
 .mnema-agent-chip { display: inline-flex; align-items: center; gap: 5px; max-width: 160px; font-size: 10px; padding: 2px 8px; border-radius: 99px; background: color-mix(in srgb, var(--mnema-accent) 12%, transparent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mnema-agent-chip i { color: var(--mnema-accent); font-size: 9px; }
+.mnema-agent-chip.warn { color: #e0a85a; background: color-mix(in srgb, #e0a85a 12%, transparent); }
+.mnema-agent-chip.warn i { color: #e0a85a; }
+.mnema-agent-list-hint { margin: 0 2px 8px; }
 .mnema-agent-badge { font-size: 10px; padding: 2px 7px; border-radius: 99px; white-space: nowrap; color: var(--mnema-accent); border: 1px solid color-mix(in srgb, var(--mnema-accent) 35%, transparent); }
 .mnema-agent-badge.off { color: var(--mnema-muted); border-color: color-mix(in srgb, var(--mnema-muted) 35%, transparent); }
 .mnema-agent-body { display: flex; flex-direction: column; gap: 10px; padding: 4px 14px 14px 44px; border-top: 1px solid color-mix(in srgb, var(--mnema-muted) 15%, transparent); }
@@ -2202,8 +2208,7 @@ html body #chat .mnema-arc-fold {
 .mnema-agent-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .mnema-agent-actions .menu_button { width: auto; margin: 0; padding: 4px 10px; font-size: 11px; }
 @media (max-width: 560px) {
-    .mnema-agent > summary { grid-template-columns: 22px minmax(0, 1fr) auto 14px; }
-    .mnema-agent-chip { display: none; }
+    .mnema-agent-chip:not(.warn) { display: none; }
     .mnema-agent-body { padding-left: 14px; }
 }
 .mnema-journal { display: flex; flex-direction: column; gap: 4px; max-height: 360px; overflow-y: auto; }

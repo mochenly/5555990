@@ -200,6 +200,8 @@ const EN = {
     'Модель не предложила ни одного нового события': 'The model proposed no new event',
     'Добавлено событий: {n}': 'Events added: {n}',
     'Буфер в сообщениях': 'Buffer in messages',
+    'профиль не выбран': 'no profile chosen',
+    'модель не указана': 'no model set',
     'Нажмите на агента, чтобы открыть его настройки и подключение.': 'Click an agent to open its settings and connection.',
     'Свой профиль': 'Own profile',
     'Своё подключение': 'Own connection',
