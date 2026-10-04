@@ -2203,3 +2203,8 @@ html body #chat .mnema-arc-fold {
 .mnema-compact-card > .mnema-section-head,
 .mnema-compact-card > h4 { margin: 0; }
 .mnema-compact-card > .mnema-hint { margin: 0; }
+
+/* Сводка: у каждой карточки свой отступ снизу, а у карточки локации его не было —
+   она общая с вкладкой «Мир», — и следующая прилипала к ней вплотную. Один
+   отступ на все карточки сводки, какие бы из них ни были видны. */
+.mnema-tab-panel[data-mnema-panel="overview"] > .mnema-glass-card { margin-top: 0; margin-bottom: 16px; }
