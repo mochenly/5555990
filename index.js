@@ -31,6 +31,7 @@ import { callAgent, onJournalChange } from './modules/agents.js';
 import { bindAgentEvents, renderAgentList, renderJournal } from './modules/agents-ui.js';
 import { createReviewer } from './modules/reviewer.js';
 import { applyCastUpdates } from './modules/cast.js';
+import { createArchivist } from './modules/archivist.js';
 import { menuHtml, popupHtml } from './modules/template.js';
 import { applyCalendarUpdates, dateFromIso, formatCalendarDate, renderCalendar, syncCalendarDate } from './modules/calendar.js';
 import { fetchModels, parseJsonResponse, requestModel } from './modules/model-api.js';
@@ -72,6 +73,7 @@ const { getParticipantVisuals, renderGallery, renderOverview, setSecretPeek, isP
 galleryImages = createGalleryImages();
 gallery = createGalleryController({ getState, getSettings: () => settings, images: galleryImages, renderGallery: state => { renderGallery(state); decorateInfoblocks(); }, onChanged: updateArcInjection, isProcessing: () => processing || Boolean(focus.status().busy) });
 gallerySettings = createGallerySettings({ getSettings: () => settings, saveSettings, onChanged: () => renderGallery(getState({ create: false })) });
+const archivist = createArchivist({ getSettings: () => settings, getState });
 const reviewer = createReviewer({
     getSettings: () => settings,
     getState,
@@ -880,7 +882,7 @@ function updateArcInjection() {
     setExtensionPrompt(PROMPT_KEY, settings.enabled ? arcs : '', extension_prompt_types.IN_PROMPT, 0, false, extension_prompt_roles.SYSTEM);
     // Кто сейчас в сцене, Mnema узнаёт по последним репликам.
     const recentText = chat.slice(-6).filter(message => message && !message.is_system && !message.extra?.mnema_arc_id).map(message => message.mes || '').join('\n');
-    const narrativeContext = settings.enabled ? buildMemoryInjection(state, settings, recentText) : '';
+    const narrativeContext = settings.enabled ? buildMemoryInjection(state, settings, recentText, { recall: archivist.current() }) : '';
     // Инструкция для основной модели идёт в самый конец чата, сразу после
     // сообщения пользователя, иначе модель про метку забывает.
     setExtensionPrompt(
@@ -1528,6 +1530,7 @@ function bindEvents() {
 
 async function onChatChanged() {
     chatEpoch++;
+    archivist.reset();
     sectionEditor.close();
     gallery.reset();
     galleryImages.cancel?.();
@@ -1583,7 +1586,12 @@ function initialize() {
     });
     // Слушатель намеренно блокирующий: Generate() ждёт MESSAGE_SENT, поэтому
     // сообщение уходит уже после того, как память заполнена.
-    eventSource.on(event_types.MESSAGE_SENT, messageId => bootstrapNewChat(messageId));
+    // Архивариус там же: найденное должно лечь в промпт этого же сообщения.
+    eventSource.on(event_types.MESSAGE_SENT, async messageId => {
+        await bootstrapNewChat(messageId);
+        await archivist.prepare(Number(messageId));
+        updateArcInjection();
+    });
     eventSource.on(event_types.USER_MESSAGE_RENDERED, () => setTimeout(() => void refreshCalendarFromChat(), 100));
     eventSource.on(event_types.MESSAGE_UPDATED, messageId => {
         // Reparse local metadata too: edited replies may contain a fresh tag.

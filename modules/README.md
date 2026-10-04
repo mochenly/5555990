@@ -13,6 +13,7 @@
 - `agents-ui.js` — the Agents tab: analysis mode, per-agent switches and connections, journal.
 - `reviewer.js` — the Editor agent: checks the newest reply against memory, marks contradictions under it and rewrites it as a new swipe with a one-off correction.
 - `cast.js` — supporting characters and which recorded secrets each knows: normalization, updates from the Knowledge keeper, who is present in the scene, the Cast tab.
+- `archivist.js` — the Archivist agent: before a user message is sent, picks the stored records (detailed arc notes, gallery entries, distant plans) the reply needs and hands them to the injection.
 - `config.js` — identifiers, defaults and shared feature metadata.
 - `utils.js` — small DOM-safe helpers.
 

@@ -581,7 +581,7 @@ function relationshipDisposition(relationship) {
     return [`Direction for how ${CHAR} conducts themself towards ${USER} at the levels reached so far — worked out from ${CHAR}'s own character, not a record of anything that happened: ${stance}${history}`];
 }
 
-export function buildMemoryInjection(state, settings, recentText = '') {
+export function buildMemoryInjection(state, settings, recentText = '', { recall = [] } = {}) {
     if (!state || !settings.enabled) return '';
     const memory = memoryState(state, settings);
     const world = memory.world;
@@ -639,6 +639,8 @@ export function buildMemoryInjection(state, settings, recentText = '') {
         const who = [member.role, member.relation].filter(Boolean).join('; ');
         values.push(`${member.name}${who ? ` (${who})` : ''} — ${member.knows.length ? `knows: ${member.knows.join('; ')}` : 'knows none of the recorded secrets'}`);
     }
+    // То, что архивариус поднял из памяти под эту реплику.
+    for (const item of recall) values.push(`Recalled — ${item.label}:\n${item.text}`);
     if (memory.gallery) {
         // Галерея растёт весь чат, а в подсказке нужны свежие — остальное
         // читается в попапе.
@@ -654,6 +656,7 @@ export function buildMemoryInjection(state, settings, recentText = '') {
         memory.secrets ? 'Secrets: what is hidden is private context only. Leaving it untouched for the whole reply is the normal outcome; no reveal, and no hint beyond what the character would plausibly let slip, without a story reason. What is already known to both is shared ground between the two of them only — they may speak of it openly between themselves, never re-hide it or reveal it a second time, but it is not public: anyone it is still hidden from does not know it, and nobody else learns it unless the story shows how. Never invent a secret.' : '',
         present.length ? 'Supporting characters: each of them knows exactly the recorded secrets listed for them and none of the others, however natural it would be for them to guess; nobody learns a secret in this reply unless the reply shows how.' : '',
         memory.gallery ? 'Shared past: mention only if the scene raises it by itself.' : '',
+        recall.length ? 'Recalled: brought back from memory because the latest message seems to reach for it. It is how things actually happened — keep to it if the reply touches it, but it does not have to come up.' : '',
     ].filter(Boolean);
 
     const intro = [
