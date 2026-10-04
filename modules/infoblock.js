@@ -286,7 +286,7 @@ function secretsSection(state, peek) {
     const context = getContext();
     const mine = own('user');
     const theirs = own('char');
-    const line = secret => `<li class="mnema-ib-secret">${icon(secret.revealed ? 'lockOpen' : 'lock')}<div><b>${escapeHtml(secret.title)}</b><small>${secret.revealed ? 'Раскрыт' : secret.owner === 'world' ? 'Тайна мира' : 'Личная тайна'}</small>${secret.summary ? `<p>${escapeHtml(secret.summary)}</p>` : ''}</div></li>`;
+    const line = secret => `<li class="mnema-ib-secret">${icon(secret.revealed ? 'lockOpen' : 'lock')}<div><b>${escapeHtml(secret.title)}</b><small>${secret.revealed ? 'Раскрыт' : secret.owner === 'world' ? 'Тайна мира' : 'Личная тайна'}</small>${secret.summary ? `<p>${escapeHtml(secret.summary)}</p>` : ''}${secret.hiddenFrom ? `<p class="mnema-ib-secret-from">${escapeHtml(t('Скрыт от: {who}', { who: secret.hiddenFrom }))}</p>` : ''}</div></li>`;
     const column = (secrets, name, glyph, owner) => {
         const hidden = owner !== 'user';
         const open = peek.has(owner);
@@ -295,7 +295,7 @@ function secretsSection(state, peek) {
         const percent = secrets.length ? Math.round(revealed / secrets.length * 100) : 0;
         const visible = secrets.filter(secret => !hidden || secret.revealed || open);
         return `<section class="mnema-ib-secret-column"><h6><span>${icon(glyph)} ${escapeHtml(name)}</span><span class="mnema-ib-secret-tools"><button type="button" class="mnema-ib-action mnema-ib-icon" data-mnema-focus="secrets" data-focus-owner="${owner}" title="Придумать секреты" aria-label="Придумать секреты: ${escapeHtml(name)}"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></button><button type="button" class="mnema-ib-action mnema-ib-icon" data-mnema-ib="add-secret" title="Добавить секрет" aria-label="Добавить секрет: ${escapeHtml(name)}" aria-expanded="false"><i class="fa-solid fa-plus" aria-hidden="true"></i></button></span></h6>
-            <form class="mnema-ib-secret-form" data-owner="${owner}" hidden><textarea name="secret" rows="3" maxlength="180" required aria-label="Новый секрет" placeholder="Новый секрет…"></textarea><div><button type="submit" class="mnema-ib-action">Добавить</button><button type="button" class="mnema-ib-action" data-mnema-ib="cancel-secret">Отмена</button></div></form>
+            <form class="mnema-ib-secret-form" data-owner="${owner}" hidden><input name="title" type="text" maxlength="60" required aria-label="Название секрета" placeholder="Название секрета…"><textarea name="summary" rows="3" maxlength="180" aria-label="Суть секрета" placeholder="Что именно скрыто и кто знает…"></textarea><input name="hiddenFrom" type="text" maxlength="120" aria-label="От кого скрыт" placeholder="От кого скрыт…"><div><button type="submit" class="mnema-ib-action">Добавить</button><button type="button" class="mnema-ib-action" data-mnema-ib="cancel-secret">Отмена</button></div></form>
             ${secrets.length ? meter(t('Раскрыто {n} из {m}', { n: revealed, m: secrets.length }), percent) : '<p class="mnema-ib-note">Секретов пока нет</p>'}
             ${visible.length ? `<ul class="mnema-ib-list">${visible.map(line).join('')}</ul>` : ''}
             ${hidden && veiled ? `<button type="button" class="mnema-ib-action" data-mnema-ib="${open ? 'unpeek' : 'peek'}" data-peek-owner="${owner}">${icon(open ? 'eyeSlash' : 'eye')} ${open ? 'Скрыть нераскрытые' : t('Показать нераскрытые ({n})', { n: veiled })}</button>` : ''}

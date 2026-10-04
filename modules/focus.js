@@ -76,7 +76,7 @@ function applyPlans(state, result, settings, kind) {
     return state.calendar.plans.length - before;
 }
 
-export function createFocusController({ getState, getSettings, onChanged, isProcessing }) {
+export function createFocusController({ getState, getSettings, onChanged, isProcessing, onRelationshipRebuilt = async () => false }) {
     let busy = null;
     const status = () => ({ busy });
 
@@ -139,6 +139,9 @@ export function createFocusController({ getState, getSettings, onChanged, isProc
                 restore();
                 throw error;
             }
+            // Пересборка стирает поведение вместе со всем разделом: пишем его
+            // заново по новым уровням, пока кнопка ещё занята.
+            if (relationship && current() && await onRelationshipRebuilt(context.chat, state) && current()) await context.saveChat();
             onChanged();
             notify(t(relationship ? 'Раздел отношений пересобран · ступеней: {n}'
                 : secrets ? 'Добавлено секретов: {n}'

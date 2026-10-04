@@ -26,7 +26,7 @@ import {
 } from './modules/config.js';
 import { clampPercent, contiguousRanges, escapeHtml, notify, resolveSurfaceColor } from './modules/utils.js';
 import { isRussianUi, observeTranslation, t, tLang } from './modules/i18n.js';
-import { buildAnalysisPrompt as composeAnalysisPrompt, buildArcPrompt, buildMemoryInjection } from './modules/prompts.js';
+import { buildAnalysisPrompt as composeAnalysisPrompt, buildArcPrompt, buildBehaviorPrompt, buildMemoryInjection } from './modules/prompts.js';
 import { menuHtml, popupHtml } from './modules/template.js';
 import { applyCalendarUpdates, dateFromIso, formatCalendarDate, renderCalendar, syncCalendarDate } from './modules/calendar.js';
 import { fetchModels, parseJsonResponse, requestModel } from './modules/model-api.js';
@@ -74,6 +74,7 @@ const focus = createFocusController({
     getState,
     getSettings: () => settings,
     isProcessing: () => processing || Boolean(gallery.status().busy),
+    onRelationshipRebuilt: (chat, state) => refreshBehavior(chat, state, chatEpoch),
     onChanged: () => {
         updateArcInjection();
         renderOverview();
@@ -109,6 +110,7 @@ function saveSettings() {
     settings.arcMaxMessages = Math.max(0, Math.min(500, Math.round(Number(settings.arcMaxMessages) || 0)));
     settings.arcMaxTokens = Math.max(0, Math.min(200000, Math.round(Number(settings.arcMaxTokens) || 0)));
     settings.arcVisibleBuffer = Math.max(0, Math.min(200, Math.round(Number(settings.arcVisibleBuffer) || 0)));
+    settings.arcBufferTokens = Math.max(0, Math.min(200000, Math.round(Number(settings.arcBufferTokens) || 0)));
     // Ноль читаем как «без предела»: иначе опечатка в поле молча слила бы все
     // арки истории в одну.
     // Ноль здесь — осмысленное значение («без предела»), поэтому `|| default`
@@ -220,6 +222,7 @@ function syncSettingsUi() {
     $('#mnema_arc_max_messages').val(settings.arcMaxMessages || '');
     $('#mnema_arc_max_tokens').val(settings.arcMaxTokens || '');
     $('#mnema_arc_visible_buffer').val(settings.arcVisibleBuffer || '');
+    $('#mnema_arc_buffer_tokens').val(settings.arcBufferTokens || '');
     $('#mnema_arc_limit').val(settings.arcLimit || '');
     $('#mnema_connection_mode').val(settings.connectionMode);
     $('#mnema_api_url').val(settings.apiUrl);
@@ -230,6 +233,13 @@ function syncSettingsUi() {
     $('#mnema_track_health').prop('checked', settings.trackHealth);
     for (const owner of SECRET_OWNERS) $(`#mnema_secret_limit_${owner}`).val(secretLimit(settings, owner));
     $('#mnema_track_secrets').prop('checked', settings.trackSecrets);
+    // Сводки прячутся одним атрибутом на <html>: is_system не трогаем, и в
+    // промпт они уходят как прежде — убираем их только с глаз.
+    document.documentElement.toggleAttribute('data-mnema-hide-arcs', Boolean(settings.hideArcSummaries));
+    $('#mnema_hide_arc_summaries').attr({
+        'aria-pressed': String(Boolean(settings.hideArcSummaries)),
+        title: t(settings.hideArcSummaries ? 'Показывать сводки арок в чате' : 'Скрыть сводки арок из чата (в контекст они всё равно идут)'),
+    }).find('i').attr('class', `fa-solid ${settings.hideArcSummaries ? 'fa-comment-slash' : 'fa-comment'}`);
     $('#mnema_collect_gallery').prop('checked', settings.collectGallery);
     $('#mnema_infoblock').prop('checked', settings.infoblock);
     $(`[name="mnema_infoblock_theme"][value="${infoblockTheme(settings.infoblockTheme)}"]`).prop('checked', true);
@@ -444,7 +454,10 @@ async function countTokens(text) {
 // Страховка от бесконечной арки: модель закрывает её по сюжету, а лимиты — по
 // объёму накопленного, чтобы конспект оставался пригодным для пересказа.
 async function arcLimitReached(chat, state) {
-    const indices = state.pending.messageIndices;
+    // Считаем только открытую арку: закрытая, но ждущая выхода из буфера, уже
+    // своё отмерила, и её сообщения не должны тут же закрыть следующую.
+    const ended = state.pending.eventNotes.filter(note => note.arcEnd).at(-1)?.range?.[1] ?? -1;
+    const indices = state.pending.messageIndices.filter(index => index > ended);
     if (!indices.length) return false;
     const maxMessages = Number(settings.arcMaxMessages) || 0;
     if (maxMessages > 0 && indices.length >= maxMessages) {
@@ -478,13 +491,62 @@ async function analyzeBatch(chat, state, indices, epoch, options = {}) {
     if (Number.isInteger(replaceNote) && state.pending.eventNotes[replaceNote]) state.pending.eventNotes[replaceNote] = note;
     else state.pending.eventNotes.push(note);
     applyAnalysisState(chat, state, result, indices);
-    state.pending.closeRequested = closeArc || await arcLimitReached(chat, state);
+    await refreshBehavior(chat, state, epoch);
+    // Конец арки помечаем на самой заметке: из-за буфера арка может закрыться
+    // не сразу, а заметки следующей тем временем ложатся следом.
+    if (closeArc || await arcLimitReached(chat, state)) note.arcEnd = true;
+    state.pending.closeRequested = state.pending.eventNotes.some(item => item.arcEnd);
     state.processedThrough = Math.max(state.processedThrough, indices[indices.length - 1]);
     // Снимок на последнем разобранном сообщении: по нему ветка вернётся к тому
     // состоянию, которое было на этой точке, а не унаследует будущее.
     storeSnapshot(chat, state, indices[indices.length - 1]);
     await getContext().saveChat();
     updateArcInjection();
+}
+
+// Поведение переписываем не на каждый интервал, а когда отношения заметно
+// сдвинулись: сменилась ступень или какой-то уровень ушёл на BEHAVIOR_DRIFT от
+// того, на котором его писали. Обычная сцена двигает уровни на 0..3, и
+// переписывать направление на каждую такую мелочь — лишний запрос и дрожь.
+const BEHAVIOR_DRIFT = 5;
+const behaviorBasis = relationship => ({
+    phase: relationship.phase,
+    ...Object.fromEntries(RELATIONSHIP_METRICS.map(([key]) => [key, relationship[key] || 0])),
+});
+
+function behaviorStale(relationship) {
+    if (!relationship?.updatedAt) return false;
+    const basis = relationship.behaviorBasis;
+    if (!relationship.behavior || !basis || basis.phase !== relationship.phase) return true;
+    return RELATIONSHIP_METRICS.some(([key]) => Math.abs((relationship[key] || 0) - (basis[key] || 0)) >= BEHAVIOR_DRIFT);
+}
+
+// Сбой здесь не должен ронять анализ: старое поведение остаётся, а запрос
+// повторится на следующем интервале — база-то не обновилась.
+async function refreshBehavior(chat, state, epoch) {
+    if (!settings.trackRelationships || !behaviorStale(state.relationship)) return false;
+    const context = getContext();
+    try {
+        // Сообщения нужны только чтобы определить язык истории: в промпт они не идут.
+        const recent = chat.map((message, index) => index).filter(index => chat[index] && !chat[index].is_system && !chat[index].extra?.mnema_arc_id).slice(-12);
+        const messages = buildBehaviorPrompt({
+            relationship: state.relationship,
+            participants: participantContext(context || {}),
+            characterName: context?.name2,
+            userName: context?.name1,
+            languageSource: serializeMessages(chat, recent),
+        });
+        const result = parseJsonResponse(await requestModel(messages, settings, 800));
+        if (epoch !== chatEpoch || getContext()?.chat !== chat) return false;
+        const behavior = String(result.behavior || '').trim().slice(0, 900);
+        if (!behavior) return false;
+        state.relationship.behavior = behavior;
+        state.relationship.behaviorBasis = behaviorBasis(state.relationship);
+        return true;
+    } catch (error) {
+        console.warn('[Mnema] Не удалось обновить поведение персонажа:', error);
+        return false;
+    }
 }
 
 function applyAnalysisState(chat, state, result, indices = null) {
@@ -621,26 +683,37 @@ async function regenerateArc(arcId) {
     }
 }
 
-// Хвост чата, который остаётся видимым даже будучи заархивированным: сводка
-// пересказывает события, но не сохраняет голос сцены, и без нескольких живых
-// реплик перед носом модель на стыке арок сбивается на пересказ.
-//
-// Пересчитываем по всем аркам сразу, а не по свежезакрытой: сообщения, попавшие
-// в буфер прошлый раз, к этому моменту уже уехали вглубь и должны скрыться.
+// Буфер — хвост чата, в который арка не заходит вовсе: сводка пересказывает
+// события, но не сохраняет голос сцены, и без нескольких живых реплик перед
+// носом модель на стыке арок сбивается на пересказ. Конспекты по этим
+// сообщениям пишутся как обычно, а арка ждёт, пока они не уйдут вглубь.
+// Считаем от конца по настоящим репликам: вставленные сводки арок видимы и
+// так, и занимать ими места в буфере значило бы урезать его молча.
+// Буфер задаётся сообщениями, токенами или обоими; при обоих берём хвост
+// длиннее — каждая настройка обещает, что не меньше этого останется живым.
+// Сообщение, на котором набрались токены, входит в буфер целиком.
+async function bufferStart(chat) {
+    let messages = Math.max(0, Number(settings.arcVisibleBuffer) || 0);
+    let tokens = Math.max(0, Number(settings.arcBufferTokens) || 0);
+    if (!messages && !tokens) return chat.length;
+    for (let index = chat.length - 1; index >= 0; index--) {
+        if (!chat[index] || chat[index].extra?.mnema_arc_id) continue;
+        if (messages > 0) messages--;
+        if (tokens > 0) tokens -= await countTokens(String(chat[index].mes || ''));
+        if (messages <= 0 && tokens <= 0) return index;
+    }
+    return 0;
+}
+
+// Сами арки в буфер не заходят, но ручная разметка и пересборка чата могут
+// его задеть — им видимость и пересчитываем. По всем аркам сразу: сообщения,
+// бывшие в буфере прошлый раз, к этому моменту уже уехали вглубь.
 async function applyArcVisibility(chat, state) {
     const archived = state.arcs.filter(arc => arc.active !== false).flatMap(arc => arc.messageIndices || []);
     if (!archived.length) return;
-    const buffer = Math.max(0, Number(settings.arcVisibleBuffer) || 0);
-    const keep = new Set();
-    // Считаем от конца по настоящим репликам: вставленные сводки арок видимы и
-    // так, и занимать ими места в буфере значило бы урезать его молча.
-    for (let index = chat.length - 1, left = buffer; index >= 0 && left > 0; index--) {
-        if (!chat[index] || chat[index].extra?.mnema_arc_id) continue;
-        keep.add(index);
-        left--;
-    }
-    const hide = archived.filter(index => !keep.has(index));
-    const show = archived.filter(index => keep.has(index));
+    const start = await bufferStart(chat);
+    const hide = archived.filter(index => index < start);
+    const show = archived.filter(index => index >= start);
     if (hide.length) await setMessagesHidden(chat, hide, true);
     if (show.length) await setMessagesHidden(chat, show, false);
 }
@@ -687,19 +760,39 @@ async function consolidateArcs(chat, state, epoch) {
 }
 
 async function finalizeArc(chat, state, epoch, { reload = true, silent = false } = {}) {
-    const indices = [...state.pending.messageIndices].filter(index => chat[index]);
-    if (!indices.length || !state.pending.eventNotes.length) { state.pending.closeRequested = false; return null; }
+    const notes = state.pending.eventNotes;
+    // Арка кончается на первой помеченной заметке; всё, что позже, — уже
+    // следующая. Заметки без пометки остались от версий до буфера: там арка
+    // закрывалась сразу, и концом была последняя.
+    const marked = notes.findIndex(note => note.arcEnd);
+    const own = notes.slice(0, (marked >= 0 ? marked : notes.length - 1) + 1);
+    const last = own.at(-1)?.range?.[1];
+    if (!own.length || !Number.isInteger(last)) { state.pending.closeRequested = false; return null; }
+    // Последнее сообщение арки ещё в буфере — ждём, просьба о закрытии остаётся.
+    if (last >= await bufferStart(chat)) return null;
+    const indices = state.pending.messageIndices.filter(index => index <= last && chat[index]);
+    if (!indices.length) {
+        for (const note of own) delete note.arcEnd;
+        state.pending.closeRequested = notes.some(note => note.arcEnd);
+        return null;
+    }
     const openThreads = collectOpenThreads(state);
     const { title, summary, recap, resolved } = await requestArcSummary(
-        state.pending.eventNotes.map(note => note.summary), t('Арка {n}', { n: state.arcs.length + 1 }), openThreads);
+        own.map(note => note.summary), t('Арка {n}', { n: state.arcs.length + 1 }), openThreads);
     if (epoch !== chatEpoch || getContext()?.chat !== chat) throw new Error('Чат сменился во время формирования арки');
-    const arc = createArc({ title, summary, recap, indices, notes: state.pending.eventNotes });
+    const arc = createArc({ title, summary, recap, indices, notes: own });
     // Чистим до вставки новой сводки: она сдвигает номера, а чистке нужно найти
     // сообщения прошлых арок по их текущим местам.
     const pruned = await pruneResolvedThreads(chat, state, openThreads, resolved);
+    // Остаток делим до вставки: вставка сдвигает номера и оставшимся заметкам.
+    const rest = notes.slice(own.length);
+    state.pending = {
+        messageIndices: state.pending.messageIndices.filter(index => index > last),
+        eventNotes: rest,
+        closeRequested: rest.some(note => note.arcEnd),
+    };
     state.arcs.push(arc);
     insertArcMessage(chat, state, arc, arcInsertPosition(indices));
-    state.pending = { messageIndices: [], eventNotes: [], closeRequested: false };
     await getContext().saveChat();
     // Слияние идёт до расчёта видимости: оно двигает номера сообщений, и
     // скрывать по старым значило бы промахнуться мимо цели.
@@ -1094,6 +1187,7 @@ async function runManualAnalysis({ chat, state, indices, wholeChat = false, skip
             throw error;
         }
         committed = true;
+        if (await refreshBehavior(chat, draftState, epoch)) await context.saveChat();
         updateArcInjection();
         notify(t('Анализ завершён. Создано арок: {n}{open}{skipped}', {
             n: count,
@@ -1235,6 +1329,7 @@ function bindEvents() {
     // отработать обязаны.
     $(document).on('click', '.mnema-arc > summary button', function (event) { event.preventDefault(); });
     $(document).on('click', '.mnema-arc-toggle', function () { void toggleArc(this.closest('.mnema-arc')?.dataset.arcId); });
+    $(document).on('click', '#mnema_hide_arc_summaries', function () { settings.hideArcSummaries = !settings.hideArcSummaries; saveSettings(); syncSettingsUi(); });
     $(document).on('click', '[data-mnema-arc-regenerate]', function () { void regenerateArc(this.dataset.mnemaArcRegenerate); });
     $(document).on('click', '.mnema-arc-fold', function () {
         const arcId = this.dataset.arcId;
@@ -1255,6 +1350,7 @@ function bindEvents() {
     $(document).on('change', '#mnema_arc_max_messages', function () { settings.arcMaxMessages = this.value; saveSettings(); syncSettingsUi(); });
     $(document).on('change', '#mnema_arc_max_tokens', function () { settings.arcMaxTokens = this.value; saveSettings(); syncSettingsUi(); });
     $(document).on('change', '#mnema_arc_visible_buffer', function () { settings.arcVisibleBuffer = this.value; saveSettings(); syncSettingsUi(); });
+    $(document).on('change', '#mnema_arc_buffer_tokens', function () { settings.arcBufferTokens = this.value; saveSettings(); syncSettingsUi(); });
     $(document).on('change', '#mnema_arc_limit', function () { settings.arcLimit = this.value; saveSettings(); syncSettingsUi(); });
     $(document).on('change', '#mnema_connection_mode', function () { settings.connectionMode = this.value === 'manual' ? 'manual' : 'profile'; saveSettings(); syncSettingsUi(); });
     $(document).on('change', '#mnema_profile', function () { settings.profileId = this.value; saveSettings(); });
@@ -1308,7 +1404,7 @@ function bindEvents() {
             const form = column.querySelector('.mnema-ib-secret-form');
             form.hidden = action === 'cancel-secret' || !form.hidden;
             column.querySelector('[data-mnema-ib="add-secret"]').setAttribute('aria-expanded', String(!form.hidden));
-            if (!form.hidden) form.elements.secret.focus();
+            if (!form.hidden) form.elements.title.focus();
             return;
         }
         if (action === 'peek' || action === 'unpeek') {
@@ -1334,13 +1430,14 @@ function bindEvents() {
         if (processing) return notify('Дождитесь завершения анализа', 'info');
         const context = getContext();
         const state = getState({ create: false });
-        const text = this.elements.secret.value.trim();
-        if (!state || !settings.trackSecrets || !text) return;
+        const title = this.elements.title.value.trim().slice(0, 60);
+        const summary = this.elements.summary.value.trim().slice(0, 180);
+        const hiddenFrom = this.elements.hiddenFrom.value.trim().slice(0, 120);
+        if (!state || !settings.trackSecrets || !title) return;
         const owner = SECRET_OWNERS.includes(this.dataset.owner) ? this.dataset.owner : 'char';
         if (!secretSlots(state, settings, owner)) return notify('Достигнут лимит секретов в этой категории', 'info');
-        const title = text.slice(0, 60);
-        if ([...state.secrets.revealed, ...state.secrets.unrevealed].some(secret => sameSecret(secret, { title, summary: text }))) return notify('Секрет с таким названием уже есть', 'info');
-        const secret = { title, summary: text.length > 60 ? text.slice(0, 180) : '', owner };
+        if ([...state.secrets.revealed, ...state.secrets.unrevealed].some(secret => sameSecret(secret, { title, summary }))) return notify('Секрет с таким названием уже есть', 'info');
+        const secret = { title, summary, owner, hiddenFrom };
         this.dataset.saving = 'true';
         state.secrets.unrevealed.push(secret);
         try {

@@ -240,7 +240,7 @@ export function popupHtml() {
                         </section>
                         <section class="mnema-tab-panel" data-mnema-panel="summaries">
                             <div class="mnema-tab-title"><span>✦</span> Арки</div>
-                            <div class="mnema-section-head"><h4>Завершённые арки</h4><span id="mnema_arc_count"></span></div>
+                            <div class="mnema-section-head"><h4>Завершённые арки</h4><span id="mnema_arc_count"></span><button type="button" id="mnema_hide_arc_summaries" class="mnema-section-edit" aria-label="Скрыть сводки арок из чата" aria-pressed="false"><i class="fa-solid fa-comment"></i></button></div>
                             <div id="mnema_arcs"></div>
                         </section>
                         <section class="mnema-tab-panel" data-mnema-panel="manual">
@@ -274,7 +274,8 @@ export function popupHtml() {
                                     <label class="mnema-field">Проверять каждые N сообщений<input id="mnema_interval" class="text_pole" type="number" min="1" max="100"></label>
                                     <label class="mnema-field">Максимум сообщений в арке<input id="mnema_arc_max_messages" class="text_pole" type="number" min="0" max="500" placeholder="0 — без предела"></label>
                                     <label class="mnema-field">Максимум токенов в арке<input id="mnema_arc_max_tokens" class="text_pole" type="number" min="0" max="200000" step="500" placeholder="0 — без предела"></label>
-                                    <label class="mnema-field">Не скрывать последние сообщения<input id="mnema_arc_visible_buffer" class="text_pole" type="number" min="0" max="200" placeholder="0 — скрывать всю арку"><small>Хвост чата остаётся видимым даже после закрытия арки, чтобы модель не теряла нить</small></label>
+                                    <label class="mnema-field">Буфер в сообщениях<input id="mnema_arc_visible_buffer" class="text_pole" type="number" min="0" max="200" placeholder="0 — без буфера"><small>Последние сообщения не попадают в арку и не скрываются: конспекты по ним пишутся, а арка закрывается, только когда её конец уйдёт старше буфера</small></label>
+                                    <label class="mnema-field">Буфер в токенах<input id="mnema_arc_buffer_tokens" class="text_pole" type="number" min="0" max="200000" step="500" placeholder="0 — без буфера"><small>То же, но хвост меряется токенами. Если заданы оба буфера, действует более длинный</small></label>
                                     <label class="mnema-field">Максимум отдельных арок<input id="mnema_arc_limit" class="text_pole" type="number" min="0" max="50" placeholder="0 — без предела"><small>Когда арок становится больше, самые старые сливаются в одно большое саммари</small></label>
                                 </div>
                                 <p class="mnema-hint">Обычно арку закрывает модель, когда сюжет пришёл к развязке. Лимиты — страховка от бесконечной арки: как только накопленные сообщения превышают предел, Mnema закрывает её сама на ближайшем анализе. 0 отключает ограничение.</p>

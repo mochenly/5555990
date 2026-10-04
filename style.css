@@ -880,6 +880,12 @@ body.mnema-popup-open { overflow: hidden; }
     white-space: pre-wrap;
 }
 
+.mnema-secret-item p.mnema-secret-from {
+    margin-top: 3px;
+    font-style: italic;
+    opacity: 0.8;
+}
+
 .mnema-calendar-toolbar {
     display: grid;
     grid-template-columns: 32px minmax(0, 1fr) 32px;
@@ -1460,6 +1466,9 @@ body.mnema-popup-open { overflow: hidden; }
     .mnema-toggle-grid, .mnema-field-row { grid-template-columns: 1fr; }
 }
 
+/* Скрытые сводки остаются в чате и уходят в промпт — это только вид. */
+html[data-mnema-hide-arcs] #chat .mes.mnema-arc-message { display: none !important; }
+
 .mes.mnema-arc-message {
     border-left: 3px solid color-mix(in srgb, var(--SmartThemeQuoteColor) 78%, transparent);
     background: linear-gradient(90deg, color-mix(in srgb, var(--SmartThemeQuoteColor) 10%, transparent), transparent 42%);
@@ -1796,7 +1805,7 @@ html body #chat .mnema-arc-fold {
 .mnema-ib-secrets h6 .mnema-ib-icon { margin: 0; width: 26px; height: 26px; min-width: 26px; border: 0; }
 .mnema-ib-secret-form[hidden] { display: none; }
 .mnema-ib-secret-form { margin-bottom: 12px; }
-.mnema-ib-secret-form textarea { box-sizing: border-box; width: 100%; resize: vertical; padding: 8px; border: 1px solid var(--SmartThemeBorderColor, #fff2); border-radius: 8px; background: #0002; color: inherit; font: inherit; }
+.mnema-ib-secret-form input, .mnema-ib-secret-form textarea { display: block; margin-bottom: 6px; box-sizing: border-box; width: 100%; resize: vertical; padding: 8px; border: 1px solid var(--SmartThemeBorderColor, #fff2); border-radius: 8px; background: #0002; color: inherit; font: inherit; }
 .mnema-ib-secret-form > div { display: flex; flex-wrap: wrap; gap: 6px; }
 .mnema-ib-secrets .mnema-ib-list { gap: 6px; margin-top: 8px; }
 .mnema-ib-secrets .mnema-ib-list .mnema-ib-secret { flex-direction: row; gap: 10px; padding: 10px; border-radius: 8px; background: #ffffff05; }
@@ -1804,6 +1813,7 @@ html body #chat .mnema-arc-fold {
 .mnema-ib-secret > div { min-width: 0; flex: 1; }
 .mnema-ib-secret small { display: block; opacity: 0.45; font-size: 0.75em; }
 .mnema-ib-secret p { margin: 6px 0 0; opacity: 0.7; font-size: 0.9em; }
+.mnema-ib-secret p.mnema-ib-secret-from { margin-top: 4px; opacity: 0.55; font-size: 0.8em; font-style: italic; }
 .mnema-ib-secrets .mnema-ib-action { font-size: 0.8em; border-style: dashed; }
 @media (max-width: 420px) {
     .mnema-ib-head { padding: 10px; gap: 8px; }
@@ -2037,7 +2047,7 @@ html body #chat .mnema-arc-fold {
 .mnema-ib[data-ib-theme="journal"] .mnema-ib-trail-card[data-state="current"] > strong { color: #785638; }
 .mnema-ib[data-ib-theme="journal"] .mnema-ib-secret-column { background: #e8dcc566; border-radius: 2px; }
 .mnema-ib[data-ib-theme="journal"] .mnema-ib-tag, .mnema-ib[data-ib-theme="journal"] .mnema-ib-date-tile, .mnema-ib[data-ib-theme="journal"] .mnema-ib-mood { border-radius: 2px; }
-.mnema-ib[data-ib-theme="journal"] .mnema-ib-secret-form textarea { background: #fff8e9; }
+.mnema-ib[data-ib-theme="journal"] .mnema-ib-secret-form input, .mnema-ib[data-ib-theme="journal"] .mnema-ib-secret-form textarea { background: #fff8e9; }
 
 /* Terminal: an instrument readout. Rows are LABEL·······VALUE with dotted
    leaders, micro uppercase keys and segmented bars — a table of data, where the

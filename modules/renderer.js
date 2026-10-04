@@ -210,7 +210,7 @@ export function createRenderer({ getState, getSettings, isProcessing, candidateI
                 <span class="mnema-secret-marker"><i class="fa-solid ${secret.revealed ? 'fa-lock-open' : 'fa-lock'}"></i></span>
                 <div>${veiled
         ? '<h5 class="mnema-secret-veil">Нераскрытая тайна</h5>'
-        : `<h5>${escapeHtml(title)}</h5>${secret.summary ? `<p>${escapeHtml(secret.summary)}</p>` : ''}`}</div>
+        : `<h5>${escapeHtml(title)}</h5>${secret.summary ? `<p>${escapeHtml(secret.summary)}</p>` : ''}${secret.hiddenFrom ? `<p class="mnema-secret-from">${escapeHtml(t('Скрыт от: {who}', { who: secret.hiddenFrom }))}</p>` : ''}`}</div>
             </article>`;
         }).join('');
         const peek = !peekable || !hidden ? ''

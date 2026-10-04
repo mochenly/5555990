@@ -168,7 +168,7 @@ export function reconcileStateWithChat(state, chat) {
     state.arcs = state.arcs.filter(arc => !(arc.messageIndices || []).some(index => index >= limit) && !(arc.range || []).some(index => index >= limit));
     state.pending.messageIndices = state.pending.messageIndices.filter(index => index < limit);
     state.pending.eventNotes = state.pending.eventNotes.filter(note => !(note.range || []).some(index => index >= limit));
-    if (!state.pending.messageIndices.length) state.pending.closeRequested = false;
+    if (!state.pending.messageIndices.length || !state.pending.eventNotes.some(note => note.arcEnd)) state.pending.closeRequested = false;
     state.processedThrough = Math.min(state.processedThrough, limit - 1);
     if (Number.isInteger(state.calendar.sourceMessageIndex) && state.calendar.sourceMessageIndex >= limit) state.calendar.sourceMessageIndex = null;
     return found ? 'snapshot' : 'pruned';
@@ -282,6 +282,9 @@ export function normalizeRelationship(value) {
         // только как предохранитель, а не как настоящая граница — иначе она
         // срезает ответ модели на полуслове.
         behavior: String(source.behavior || '').trim().slice(0, 900),
+        // Ступень и уровни, на которых поведение было написано: по ним видно,
+        // пора ли его переписать. Без них — пора.
+        behaviorBasis: source.behaviorBasis && typeof source.behaviorBasis === 'object' ? { ...source.behaviorBasis } : null,
         progress: clampPercent(source.progress),
         trust: clampPercent(source.trust),
         passion: clampPercent(source.passion),
@@ -386,8 +389,6 @@ export function applyRelationshipUpdate(state, update, settings) {
     // уже пройден, и лучше пустое поле, чем описание вчерашнего порога.
     else if (patch.phase) patch.nextStep = '';
     if (typeof update.stage === 'string' && update.stage.trim()) patch.stage = update.stage.trim();
-    if (typeof update.behavior === 'string') patch.behavior = update.behavior.trim();
-    else if ((patch.stage && patch.stage !== previous.stage) || patch.phase) patch.behavior = '';
     for (const key of ['progress', ...RELATIONSHIP_METRICS.map(([metric]) => metric)]) {
         if (typeof update[key] === 'number' && Number.isFinite(update[key])) patch[key] = update[key];
     }
@@ -435,6 +436,10 @@ function normalizeSecretEntry(entry) {
         title,
         summary: String(source.summary || source.details || source.description || '').trim().slice(0, 600),
         owner: normalizeSecretOwner(source.owner ?? source.whose ?? source.holder),
+        // От кого тайна скрыта, словами самой истории. Раскрытие между двумя
+        // героями его не снимает: без этого поля раскрытый секрет читался как
+        // общеизвестный.
+        hiddenFrom: String(source.hiddenFrom ?? source.hidden_from ?? '').trim().slice(0, 120),
     };
 }
 
@@ -444,9 +449,11 @@ export function applySecretsUpdate(state, update, settings) {
     for (const raw of Array.isArray(update.reveal) ? update.reveal : []) {
         const title = String(typeof raw === 'string' ? raw : raw?.title || '').trim();
         if (!title) continue;
+        const hiddenFrom = String(raw?.hiddenFrom ?? raw?.hidden_from ?? '').trim().slice(0, 120);
         const index = findByTitle(state.secrets.unrevealed, title);
         if (index < 0) continue;
         const [secret] = state.secrets.unrevealed.splice(index, 1);
+        if (hiddenFrom) secret.hiddenFrom = hiddenFrom;
         if (findByTitle(state.secrets.revealed, secret.title) < 0) state.secrets.revealed.push(secret);
     }
     for (const raw of Array.isArray(update.new_unrevealed) ? update.new_unrevealed : []) {
@@ -454,7 +461,7 @@ export function applySecretsUpdate(state, update, settings) {
         if (secret) { secret.summary = secret.summary.slice(0, 180); }
         if (!secret) continue;
         const existing = [...state.secrets.unrevealed, ...state.secrets.revealed].find(item => sameSecret(item, secret));
-        if (existing) { if (secret.summary) existing.summary = secret.summary; /* Keep the existing owner and disclosure state. */ }
+        if (existing) { if (secret.summary) existing.summary = secret.summary; if (secret.hiddenFrom) existing.hiddenFrom = secret.hiddenFrom; /* Keep the existing owner and disclosure state. */ }
         else if (secretSlots(state, settings, secret.owner)) state.secrets.unrevealed.push({ ...secret, title: secret.title.slice(0, 60) });
     }
     for (const raw of Array.isArray(update.new_revealed) ? update.new_revealed : []) {
@@ -464,8 +471,8 @@ export function applySecretsUpdate(state, update, settings) {
         const hiddenIndex = state.secrets.unrevealed.findIndex(item => sameSecret(item, secret));
         const previous = hiddenIndex >= 0 ? state.secrets.unrevealed.splice(hiddenIndex, 1)[0] : null;
         const existing = state.secrets.revealed.find(item => sameSecret(item, secret));
-        if (existing) { if (secret.summary) existing.summary = secret.summary; /* Keep the existing owner and disclosure state. */ }
-        else if (previous || secretSlots(state, settings, secret.owner)) state.secrets.revealed.push({ ...secret, title: previous?.title || secret.title.slice(0, 60), summary: secret.summary || previous?.summary || '', owner: previous?.owner || secret.owner });
+        if (existing) { if (secret.summary) existing.summary = secret.summary; if (secret.hiddenFrom) existing.hiddenFrom = secret.hiddenFrom; /* Keep the existing owner and disclosure state. */ }
+        else if (previous || secretSlots(state, settings, secret.owner)) state.secrets.revealed.push({ ...secret, title: previous?.title || secret.title.slice(0, 60), summary: secret.summary || previous?.summary || '', hiddenFrom: secret.hiddenFrom || previous?.hiddenFrom || '', owner: previous?.owner || secret.owner });
     }
 }
 
