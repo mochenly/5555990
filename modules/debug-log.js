@@ -132,7 +132,7 @@ export function renderDebugLog() {
 }
 
 export function debugPanelHtml() {
-    return `<div class="mnema-settings-section mnema-glass-card">
+    return `<div class="mnema-settings-section mnema-glass-card mnema-compact-card">
         <div class="mnema-section-head"><h4>Журнал отладки</h4><span id="mnema_debug_count" class="mnema-debug-count"></span></div>
         <p class="mnema-hint">Всё, что Mnema пишет о своей работе: ошибки, предупреждения, уведомления и запросы к модели. Живёт до перезагрузки страницы. Если что-то сломалось — скачайте журнал и пришлите его вместе с описанием; ключ API в файл не попадает.</p>
         <label class="mnema-check mnema-glass-card"><input id="mnema_debug_prompts" type="checkbox"> <span><strong>Записывать промпты и ответы модели целиком</strong><small>Нужно, когда модель отвечает не то. Журнал станет большим, а в выгрузку попадёт текст вашей истории</small></span></label>

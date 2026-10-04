@@ -2192,3 +2192,10 @@ html body #chat .mnema-arc-fold {
 #mnema_popup * { scrollbar-width: none; }
 #mnema_popup::-webkit-scrollbar,
 #mnema_popup *::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+/* Плотная карточка настроек: заголовок, подсказка и содержимое без воздушных
+   зазоров сетки, отступов шапки и подсказки, сложенных друг с другом. */
+.mnema-settings-section.mnema-compact-card { gap: 8px; }
+.mnema-compact-card > .mnema-section-head,
+.mnema-compact-card > h4 { margin: 0; }
+.mnema-compact-card > .mnema-hint { margin: 0; }
