@@ -9,6 +9,8 @@
 - `state.js` — chat metadata persistence, normalization and sparse section updates.
 - `analysis.js` — participant profiles, message selection, manual arc validation and rebuilding helpers.
 - `model-api.js` — Connection Manager and manual Extra API transport.
+- `agents.js` — agent registry, per-agent connection override and the session journal; `callAgent` is the only way agents reach the model.
+- `agents-ui.js` — the Agents tab: analysis mode, per-agent switches and connections, journal.
 - `config.js` — identifiers, defaults and shared feature metadata.
 - `utils.js` — small DOM-safe helpers.
 

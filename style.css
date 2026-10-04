@@ -2169,3 +2169,25 @@ html body #chat .mnema-arc-fold {
 @media (prefers-reduced-motion: reduce) {
     .mnema-ib[data-ib-theme] *, .mnema-ib-theme-card { transition: none !important; animation: none !important; }
 }
+/* ---------- Агенты ---------- */
+.mnema-agent-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin: 12px 0; }
+.mnema-agent { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
+.mnema-agent.disabled { opacity: 0.55; }
+.mnema-agent header { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 8px; align-items: start; }
+.mnema-agent header > i { color: var(--mnema-accent); font-size: 15px; margin-top: 2px; }
+.mnema-agent header strong { display: block; font-size: 12px; }
+.mnema-agent header small { display: block; color: var(--mnema-muted); font-size: 10.5px; line-height: 1.45; margin-top: 2px; }
+.mnema-agent .mnema-field { margin: 0; font-size: 11px; }
+.mnema-agent-badge { font-size: 10px; padding: 2px 7px; border-radius: 99px; white-space: nowrap; color: var(--mnema-accent); border: 1px solid color-mix(in srgb, var(--mnema-accent) 35%, transparent); }
+.mnema-agent-badge.off { color: var(--mnema-muted); border-color: color-mix(in srgb, var(--mnema-muted) 35%, transparent); }
+.mnema-agent-switch { display: flex; align-items: center; gap: 5px; font-size: 10.5px; white-space: nowrap; cursor: pointer; }
+.mnema-journal { display: flex; flex-direction: column; gap: 4px; max-height: 360px; overflow-y: auto; }
+.mnema-journal-row { display: grid; grid-template-columns: 14px auto minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 5px 8px; border-radius: 8px; background: #0001; font-size: 11px; }
+.mnema-journal-row > i { color: var(--mnema-accent); }
+.mnema-journal-row.error > i { color: #e07a6a; }
+.mnema-journal-row time { color: var(--mnema-muted); font-variant-numeric: tabular-nums; }
+.mnema-journal-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mnema-journal-meta { color: var(--mnema-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mnema-journal-row p { grid-column: 2 / -1; margin: 0; color: var(--mnema-muted); font-size: 10.5px; line-height: 1.45; }
+.mnema-journal-row.error p { color: #e07a6a; }
+.mnema-journal-total { color: var(--mnema-muted); font-size: 11px; margin-left: auto; }

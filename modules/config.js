@@ -21,6 +21,11 @@ export const DEFAULT_SETTINGS = Object.freeze({
     arcLimit: 3,
     // Только вид: сводки остаются в чате и уходят в промпт.
     hideArcSummaries: false,
+    // Разбор интервала: 'agents' — распорядитель и специалисты, 'single' — один
+    // общий запрос, как было до агентов.
+    analysisMode: 'agents',
+    // Свои настройки агентов: { [id]: { enabled, profileId, model } }.
+    agents: Object.freeze({}),
     connectionMode: 'profile',
     profileId: '',
     apiUrl: '',

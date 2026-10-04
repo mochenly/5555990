@@ -1,6 +1,7 @@
 import { MENU_BUTTON_ID, POPUP_ID } from './config.js';
 import { infoblockThemesHtml } from './infoblock-themes.js';
 import { gallerySettingsHtml } from './gallery-settings.js';
+import { agentsPanelHtml } from './agents-ui.js';
 
 export function menuHtml() {
     return `
@@ -36,6 +37,7 @@ export function popupHtml() {
                         <button class="mnema-tab-btn" data-mnema-tab="health" title="Здоровье"><span class="mnema-tab-ornament">✦</span><i class="fa-solid fa-notes-medical"></i><span class="mnema-tab-label">Здоровье</span><span id="mnema_health_badge" class="mnema-tab-badge critical" hidden>!</span></button>
                         <div class="mnema-sidebar-label">Техническое</div>
                         <button class="mnema-tab-btn" data-mnema-tab="summaries" title="Арки"><span class="mnema-tab-ornament">✦</span><i class="fa-solid fa-book-open"></i><span class="mnema-tab-label">Арки</span><span id="mnema_arc_badge" class="mnema-tab-badge" hidden></span></button>
+                        <button class="mnema-tab-btn" data-mnema-tab="agents" title="Агенты"><span class="mnema-tab-ornament">✦</span><i class="fa-solid fa-robot"></i><span class="mnema-tab-label">Агенты</span></button>
                         <button class="mnema-tab-btn" data-mnema-tab="manual" title="Ручной анализ"><span class="mnema-tab-ornament">✦</span><i class="fa-solid fa-scissors"></i><span class="mnema-tab-label">Ручной анализ</span></button>
                         <button class="mnema-tab-btn" data-mnema-tab="settings" title="Настройки"><span class="mnema-tab-ornament">✦</span><i class="fa-solid fa-sliders"></i><span class="mnema-tab-label">Настройки</span></button>
                     </nav>
@@ -265,6 +267,7 @@ export function popupHtml() {
                                 <div class="mnema-manual-progress-track"><i id="mnema_manual_progress_fill"></i></div>
                             </div>
                         </section>
+                        ${agentsPanelHtml()}
                         <section id="mnema_settings" class="mnema-tab-panel" data-mnema-panel="settings">
                             <div class="mnema-tab-title"><span>✦</span> Настройки</div>
                             <div class="mnema-settings-section">

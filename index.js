@@ -26,7 +26,9 @@ import {
 } from './modules/config.js';
 import { clampPercent, contiguousRanges, escapeHtml, notify, resolveSurfaceColor } from './modules/utils.js';
 import { isRussianUi, observeTranslation, t, tLang } from './modules/i18n.js';
-import { buildAnalysisPrompt as composeAnalysisPrompt, buildArcPrompt, buildBehaviorPrompt, buildMemoryInjection } from './modules/prompts.js';
+import { buildAnalysisPrompt as composeAnalysisPrompt, buildArcPrompt, buildBehaviorPrompt, buildMemoryInjection, buildRouterPrompt, enabledSections, unrecordedSections } from './modules/prompts.js';
+import { callAgent, onJournalChange } from './modules/agents.js';
+import { bindAgentEvents, renderAgentList, renderJournal } from './modules/agents-ui.js';
 import { menuHtml, popupHtml } from './modules/template.js';
 import { applyCalendarUpdates, dateFromIso, formatCalendarDate, renderCalendar, syncCalendarDate } from './modules/calendar.js';
 import { fetchModels, parseJsonResponse, requestModel } from './modules/model-api.js';
@@ -198,6 +200,7 @@ function syncManualModels() {
 }
 
 function updateSectionVisibility() {
+    renderAgentList(settings, getProfiles());
     const visibility = {
         relationships: settings.trackRelationships,
         calendar: settings.trackCalendar,
@@ -225,6 +228,7 @@ function syncSettingsUi() {
     $('#mnema_arc_buffer_tokens').val(settings.arcBufferTokens || '');
     $('#mnema_arc_limit').val(settings.arcLimit || '');
     $('#mnema_connection_mode').val(settings.connectionMode);
+    renderAgentList(settings, getProfiles());
     $('#mnema_api_url').val(settings.apiUrl);
     $('#mnema_api_key').val(settings.apiKey);
     $('#mnema_model').val(settings.model);
@@ -479,8 +483,9 @@ async function analyzeBatch(chat, state, indices, epoch, options = {}) {
     // replaceNote — повторная проверка уже разобранного интервала: заметка о нём
     // заменяется, а не ложится второй копией. В промпт этот флаг не идёт.
     const { replaceNote = null, ...promptOptions } = options;
-    const messages = buildAnalysisPrompt(chat, state, indices, promptOptions);
-    const result = parseJsonResponse(await requestModel(messages, settings, 1800));
+    const result = settings.analysisMode === 'single'
+        ? parseJsonResponse(await requestModel(buildAnalysisPrompt(chat, state, indices, promptOptions), settings, 1800))
+        : await analyzeWithAgents(chat, state, indices, promptOptions);
     if (epoch !== chatEpoch || getContext()?.chat !== chat) throw new Error('Чат сменился во время анализа');
     const summary = String(result.event_summary || result.summary || '').trim();
     if (!summary) throw new Error('В ответе модели отсутствует event_summary');
@@ -536,7 +541,7 @@ async function refreshBehavior(chat, state, epoch) {
             userName: context?.name1,
             languageSource: serializeMessages(chat, recent),
         });
-        const result = parseJsonResponse(await requestModel(messages, settings, 800));
+        const result = await callAgent('behavior', messages, settings, 800);
         if (epoch !== chatEpoch || getContext()?.chat !== chat) return false;
         const behavior = String(result.behavior || '').trim().slice(0, 900);
         if (!behavior) return false;
@@ -547,6 +552,51 @@ async function refreshBehavior(chat, state, epoch) {
         console.warn('[Mnema] Не удалось обновить поведение персонажа:', error);
         return false;
     }
+}
+
+// Разбор интервала агентами: распорядитель пишет конспект, решает судьбу арки
+// и называет задетые разделы; специалисты обновляют каждый свой. Ответ
+// собирается в ту же форму, что у единого запроса, и дальше они идут одной
+// дорогой — применение состояния о режиме ничего не знает.
+const SPECIALIST_TOKENS = { relationship: 2000 };
+async function analyzeWithAgents(chat, state, indices, promptOptions = {}) {
+    const context = getContext();
+    const detectArcEnd = promptOptions.detectArcEnd !== false;
+    const route = await callAgent('router', buildRouterPrompt({
+        state, settings, detectArcEnd,
+        characterName: context?.name2,
+        userName: context?.name1,
+        messages: serializeMessages(chat, indices),
+    }), settings, 900, {
+        describe: result => [
+            Array.isArray(result?.sections) && result.sections.length ? t('Разделы: {list}', { list: result.sections.join(', ') }) : t('Разделы не задеты'),
+            result?.close_arc === true ? t('арка закончилась') : '',
+        ].filter(Boolean).join(' · '),
+    });
+    const enabled = enabledSections(settings);
+    // Ответ без списка разделов — сбой распорядителя, а не «ничего не
+    // изменилось»: тогда проверяют все, лишний запрос дешевле потерянного факта.
+    const asked = Array.isArray(route?.sections) ? route.sections.map(String) : enabled;
+    const wanted = enabled.filter(section => asked.includes(section) || unrecordedSections(state, settings).includes(section));
+    const outcomes = await Promise.allSettled(wanted.map(section => callAgent(section,
+        buildAnalysisPrompt(chat, state, indices, { ...promptOptions, only: [section], summary: false, detectArcEnd: false }),
+        settings, SPECIALIST_TOKENS[section] || 1200,
+        { describe: result => Object.keys(result || {}).length ? t('Есть обновления') : t('Без изменений') })));
+    const result = { event_summary: route?.event_summary, close_arc: route?.close_arc, arc_reason: route?.arc_reason };
+    const failed = [];
+    outcomes.forEach((outcome, index) => {
+        if (outcome.status !== 'fulfilled') {
+            failed.push(wanted[index]);
+            console.warn(`[Mnema] Специалист «${wanted[index]}» не ответил:`, outcome.reason);
+            return;
+        }
+        // Конспект и арку решает только распорядитель: специалист, вернувший
+        // их по старой памяти, не должен их перебить.
+        const { event_summary, summary, close_arc, arc_reason, ...updates } = outcome.value && typeof outcome.value === 'object' ? outcome.value : {};
+        Object.assign(result, updates);
+    });
+    if (failed.length) notify(t('Не ответили специалисты: {list}. Их разделы проверятся на следующем интервале', { list: failed.join(', ') }), 'warning');
+    return result;
 }
 
 function applyAnalysisState(chat, state, result, indices = null) {
@@ -595,7 +645,7 @@ function collectOpenThreads(state) {
 
 async function requestArcSummary(noteSummaries, fallbackTitle, openThreads = []) {
     const messages = buildArcPrompt(noteSummaries, participantContext(getContext() || {}), openThreads.map(thread => thread.text));
-    const result = parseJsonResponse(await requestModel(messages, settings, 2400));
+    const result = await callAgent('arcs', messages, settings, 2400, { describe: result => String(result?.title || '') });
     const summary = String(result.summary || '').trim();
     if (!summary) throw new Error('В ответе модели отсутствует summary');
     return {
@@ -1280,6 +1330,7 @@ async function refreshCalendarFromChat() {
 
 function bindEvents() {
     sectionEditor.bindEvents();
+    bindAgentEvents({ getSettings: () => settings, saveSettings, rerender: () => renderAgentList(settings, getProfiles()) });
     gallery.bindEvents();
     gallerySettings.bindEvents();
     $(document).on('click', `#${MENU_BUTTON_ID}`, openPopup);
@@ -1502,6 +1553,7 @@ function initialize() {
     // шаблоне сообщения, и каждая новая реплика клонировалась уже с подписью.
     document.querySelectorAll('#message_template .mes').forEach(element => element.classList.remove('mnema-arc-message', 'mnema-arc-source', 'mnema-arc-unfolded'));
     bindEvents(); syncSettingsUi(); void onChatChanged();
+    onJournalChange(renderJournal); renderJournal();
     eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
     eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, messageId => {
         // Метку разбираем до анализа: она уточняет дату и место для конспекта.
