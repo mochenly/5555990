@@ -4,6 +4,7 @@ import { gallerySettingsHtml } from './gallery-settings.js';
 import { agentsPanelHtml } from './agents-ui.js';
 import { castPanelHtml } from './cast.js';
 import { directorPanelHtml } from './director.js';
+import { debugPanelHtml } from './debug-log.js';
 
 export function menuHtml() {
     return `
@@ -327,6 +328,7 @@ export function popupHtml() {
                                 </div>
                                 <button id="mnema_test_connection" class="menu_button" type="button"><i class="fa-solid fa-plug"></i> Проверить подключение</button>
                             </div>
+                            ${debugPanelHtml()}
                         </section>
                     </main>
                 </div>

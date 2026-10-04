@@ -89,7 +89,7 @@ export async function callAgent(id, messages, settings, maxTokens, { json = true
     emit();
     const started = performance.now();
     try {
-        const text = await requestModel(messages, agentSettings(settings, id), maxTokens);
+        const text = await requestModel(messages, agentSettings(settings, id), maxTokens, `agent:${id}`);
         entry.outTokens = estimateTokens(text);
         const result = json ? parseJsonResponse(text) : text;
         entry.status = 'ok';

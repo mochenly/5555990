@@ -1,4 +1,5 @@
 import { t } from './i18n.js';
+import { debugLog } from './debug-log.js';
 
 export function escapeHtml(value) {
     const node = document.createElement('span');
@@ -11,6 +12,7 @@ export function escapeHtml(value) {
 // строка ключом не является и возвращается как есть.
 export function notify(message, type = 'info') {
     const text = t(String(message ?? ''));
+    debugLog(type === 'error' ? 'error' : type === 'warning' ? 'warn' : 'notify', 'notify', text);
     const toast = globalThis.toastr?.[type] || globalThis.toastr?.info;
     if (toast) toast(text, 'Mnema');
     else console[type === 'error' ? 'error' : 'log'](`[Mnema] ${text}`);

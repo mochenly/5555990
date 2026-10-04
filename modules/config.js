@@ -26,6 +26,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
     analysisMode: 'agents',
     // Свои настройки агентов: { [id]: { enabled, profileId, model } }.
     agents: Object.freeze({}),
+    // Журнал отладки: писать ли промпты и ответы модели целиком.
+    debugPrompts: false,
     connectionMode: 'profile',
     profileId: '',
     apiUrl: '',

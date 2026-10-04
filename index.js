@@ -48,9 +48,14 @@ import { createGallerySettings } from './modules/gallery-settings.js';
 import { initializeGallerySettings } from './modules/gallery-data.js';
 import { candidateIndices, participantContext, prepareRebuiltChat, validateManualArcs, wholeChatIndices } from './modules/analysis.js';
 import { applySceneToState, buildInfoblock, hasSceneTag, infoblockInstruction, lastCharacterMessageIndex, parseSceneTag, readStoredScene, removeInfoblocks, renderInfoblock, sceneTagSource, setTrailFocus, storeScene, stripSceneTagFromMessage } from './modules/infoblock.js';
+import { clearDebugLog, debugLog, downloadDebugReport, installDebugCapture, onDebugChange, renderDebugLog } from './modules/debug-log.js';
 // ВРЕМЕННО: предпросмотр заполненного интерфейса, удалить вместе с demo.js.
 import { fillDemoState } from './modules/demo.js';
 
+// Как можно раньше: журнал должен застать и ошибки загрузки.
+installDebugCapture();
+
+const MNEMA_VERSION = '0.8.0';
 let settings;
 let processing = false;
 let chatEpoch = 0;
@@ -243,6 +248,7 @@ function syncSettingsUi() {
     $('#mnema_arc_limit').val(settings.arcLimit || '');
     $('#mnema_connection_mode').val(settings.connectionMode);
     renderAgentList(settings, getProfiles());
+    $('#mnema_debug_prompts').prop('checked', Boolean(settings.debugPrompts));
     $('#mnema_api_url').val(settings.apiUrl);
     $('#mnema_api_key').val(settings.apiKey);
     $('#mnema_model').val(settings.model);
@@ -498,7 +504,7 @@ async function analyzeBatch(chat, state, indices, epoch, options = {}) {
     // заменяется, а не ложится второй копией. В промпт этот флаг не идёт.
     const { replaceNote = null, ...promptOptions } = options;
     const result = settings.analysisMode === 'single'
-        ? parseJsonResponse(await requestModel(buildAnalysisPrompt(chat, state, indices, promptOptions), settings, 1800))
+        ? parseJsonResponse(await requestModel(buildAnalysisPrompt(chat, state, indices, promptOptions), settings, 1800, 'analysis'))
         : await analyzeWithAgents(chat, state, indices, promptOptions);
     if (epoch !== chatEpoch || getContext()?.chat !== chat) throw new Error('Чат сменился во время анализа');
     const summary = String(result.event_summary || result.summary || '').trim();
@@ -515,6 +521,7 @@ async function analyzeBatch(chat, state, indices, epoch, options = {}) {
     // не сразу, а заметки следующей тем временем ложатся следом.
     if (closeArc || await arcLimitReached(chat, state)) note.arcEnd = true;
     state.pending.closeRequested = state.pending.eventNotes.some(item => item.arcEnd);
+    debugLog('info', 'analysis', `#${indices[0]}–#${indices[indices.length - 1]} разобран${note.arcEnd ? ' · арка закончилась' : ''}`, settings.debugPrompts ? result : undefined);
     state.processedThrough = Math.max(state.processedThrough, indices[indices.length - 1]);
     // Снимок на последнем разобранном сообщении: по нему ветка вернётся к тому
     // состоянию, которое было на этой точке, а не унаследует будущее.
@@ -836,7 +843,10 @@ async function finalizeArc(chat, state, epoch, { reload = true, silent = false }
     const last = own.at(-1)?.range?.[1];
     if (!own.length || !Number.isInteger(last)) { state.pending.closeRequested = false; return null; }
     // Последнее сообщение арки ещё в буфере — ждём, просьба о закрытии остаётся.
-    if (last >= await bufferStart(chat)) return null;
+    if (last >= await bufferStart(chat)) {
+        debugLog('info', 'arc', `Арка до #${last} ждёт выхода из буфера`);
+        return null;
+    }
     const indices = state.pending.messageIndices.filter(index => index <= last && chat[index]);
     if (!indices.length) {
         for (const note of own) delete note.arcEnd;
@@ -868,6 +878,7 @@ async function finalizeArc(chat, state, epoch, { reload = true, silent = false }
     await runArcAgents(chat, state, epoch);
     updateArcInjection();
     if (reload) await reloadCurrentChat();
+    debugLog('info', 'arc', `Арка «${arc.title}» закрыта: #${indices[0]}–#${indices[indices.length - 1]}`);
     if (!silent) {
         notify(t('Арка «{title}» завершена', { title: arc.title }), 'success');
         if (pruned) notify(t('Закрыто открытых линий в прошлых арках: {n}', { n: pruned }), 'info');
@@ -1270,7 +1281,7 @@ async function runManualAnalysis({ chat, state, indices, wholeChat = false, skip
         const messages = buildAnalysisPrompt(chat, analysisState, indices, {
             manual: true, wholeChat, sections: wholeChat, detectArcEnd: false,
         });
-        const result = parseJsonResponse(await requestModel(messages, settings, 8192));
+        const result = parseJsonResponse(await requestModel(messages, settings, 8192, 'manual'));
         if (manualRunCancelled) { notify('Анализ отменён, данные не изменены', 'info'); return; }
         if (epoch !== chatEpoch || getContext()?.chat !== chat) throw new Error('Чат сменился во время анализа');
         if (JSON.stringify(chat) !== original || JSON.stringify(state) !== originalState) {
@@ -1573,9 +1584,28 @@ function bindEvents() {
             notify(error.message || 'Не удалось сохранить секрет', 'error');
         } finally { delete this.dataset.saving; }
     });
+    $(document).on('change', '#mnema_debug_prompts', function () { settings.debugPrompts = this.checked; saveSettings(); });
+    $(document).on('click', '#mnema_debug_clear', () => clearDebugLog());
+    $(document).on('click', '#mnema_debug_download', () => {
+        const state = getState({ create: false });
+        const chat = getContext()?.chat || [];
+        downloadDebugReport({
+            settings,
+            version: MNEMA_VERSION,
+            extra: {
+                Chat: `${chat.length} messages`,
+                State: state ? {
+                    processedThrough: state.processedThrough,
+                    pending: { messages: state.pending.messageIndices.length, notes: state.pending.eventNotes.length, closeRequested: state.pending.closeRequested },
+                    arcs: state.arcs.length,
+                    secrets: state.secrets.unrevealed.length + state.secrets.revealed.length,
+                } : 'none',
+            },
+        });
+    });
     $(document).on('click', '#mnema_test_connection', async function () {
         const button = $(this).prop('disabled', true);
-        try { const response = await requestModel([{ role: 'user', content: 'Reply with one word: OK' }], settings, 16); notify(`Подключение работает: ${response.slice(0, 80)}`, 'success'); }
+        try { const response = await requestModel([{ role: 'user', content: 'Reply with one word: OK' }], settings, 16, 'test'); notify(`Подключение работает: ${response.slice(0, 80)}`, 'success'); }
         catch (error) { notify(error.message || String(error), 'error'); }
         finally { button.prop('disabled', false); }
     });
@@ -1625,6 +1655,8 @@ function initialize() {
     document.querySelectorAll('#message_template .mes').forEach(element => element.classList.remove('mnema-arc-message', 'mnema-arc-source', 'mnema-arc-unfolded'));
     bindEvents(); syncSettingsUi(); void onChatChanged();
     onJournalChange(renderJournal); renderJournal();
+    onDebugChange(renderDebugLog); renderDebugLog();
+    debugLog('info', 'init', `Mnema ${MNEMA_VERSION} загружена`);
     eventSource.on(event_types.CHAT_CHANGED, onChatChanged);
     eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, messageId => {
         // Метку разбираем до анализа: она уточняет дату и место для конспекта.

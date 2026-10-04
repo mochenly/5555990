@@ -16,6 +16,7 @@
 - `archivist.js` — the Archivist agent: before a user message is sent, picks the stored records (detailed arc notes, gallery entries, distant plans) the reply needs and hands them to the injection.
 - `director.js` — the Director agent: after an arc closes, proposes a few directions grown from established threads; shown in the overview and passed to the narrator as optional pressure.
 - `janitor.js` — the Janitor agent: after an arc closes, merges secrets and characters recorded twice and drops plans that are over; acts only on exact matches, the last run can be undone.
+- `debug-log.js` — session debug log: captures Mnema console output, notifications, model requests and uncaught errors from its own files; renders the settings panel and exports a report with the API key removed.
 - `config.js` — identifiers, defaults and shared feature metadata.
 - `utils.js` — small DOM-safe helpers.
 

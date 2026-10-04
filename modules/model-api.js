@@ -1,4 +1,5 @@
 import { ConnectionManagerRequestService } from '/scripts/extensions/shared.js';
+import { debugLog } from './debug-log.js';
 
 // Базовый адрес API: и запрос генерации, и список моделей растут из него.
 function apiBase(value) {
@@ -49,7 +50,24 @@ function extractText(value) {
     return value?.content || value?.text || '';
 }
 
-export async function requestModel(messages, settings, maxTokens = 1000) {
+// Каждый запрос к модели — строка в журнале отладки: кто спросил, сколько
+// ждали, чем кончилось. Полный текст промпта и ответа — только по отдельной
+// настройке: он большой и содержит историю пользователя.
+export async function requestModel(messages, settings, maxTokens = 1000, label = 'model') {
+    const started = performance.now();
+    const size = messages.reduce((sum, message) => sum + String(message.content || '').length, 0);
+    debugLog('request', label, `${settings.connectionMode === 'manual' ? `manual: ${settings.model}` : `profile: ${settings.profileId}`} · ${size} chars · max ${maxTokens} tokens`, settings.debugPrompts ? messages : undefined);
+    try {
+        const text = await sendModelRequest(messages, settings, maxTokens);
+        debugLog('response', label, `${Math.round(performance.now() - started)} ms · ${text.length} chars`, settings.debugPrompts ? text : undefined);
+        return text;
+    } catch (error) {
+        debugLog('error', label, `${Math.round(performance.now() - started)} ms · ${error?.message || error}`, error);
+        throw error;
+    }
+}
+
+async function sendModelRequest(messages, settings, maxTokens) {
     if (settings.connectionMode === 'profile') {
         if (!settings.profileId) throw new Error('Выберите профиль подключения SillyTavern');
         const prompt = ConnectionManagerRequestService.constructPrompt(messages, settings.profileId);
