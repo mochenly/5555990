@@ -2215,3 +2215,13 @@ html body #chat .mnema-arc-fold {
 .mnema-cast-knows > span { color: var(--mnema-muted); }
 .mnema-cast-knows em { font-style: normal; padding: 1px 7px; border-radius: 99px; border: 1px solid color-mix(in srgb, var(--mnema-accent) 35%, transparent); }
 .mnema-cast-knows em i { font-size: 8px; color: var(--mnema-accent); }
+
+/* ---------- Режиссёр и действия агентов ---------- */
+.mnema-agent-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.mnema-agent-actions .menu_button { width: auto; margin: 0; padding: 4px 10px; font-size: 11px; }
+.mnema-director { margin-top: 12px; padding: 12px 14px; }
+.mnema-director h4 i { color: var(--mnema-accent); margin-right: 4px; }
+.mnema-director ol { margin: 8px 0 0; padding-left: 20px; }
+.mnema-director li { margin-bottom: 8px; }
+.mnema-director li p { margin: 0; font-size: 12px; line-height: 1.5; }
+.mnema-director li small { display: block; color: var(--mnema-muted); font-size: 10.5px; margin-top: 2px; }

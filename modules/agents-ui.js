@@ -37,9 +37,13 @@ function agentCard(agent, settings, profiles) {
             <option value="">${escapeHtml(t('Как основное'))}</option>
             ${profiles.map(profile => `<option value="${escapeHtml(profile.id)}" ${own.profileId === profile.id ? 'selected' : ''}>${escapeHtml(profile.name || profile.model || profile.id)}</option>`).join('')}
         </select></label>`;
+    const actions = enabled && agent.actions?.length
+        ? `<div class="mnema-agent-actions">${agent.actions.map(action => `<button type="button" class="menu_button" data-agent-action="${agent.id}:${action.id}"><i class="fa-solid ${action.icon}" aria-hidden="true"></i> ${escapeHtml(t(action.label))}</button>`).join('')}</div>`
+        : '';
     return `<article class="mnema-agent mnema-glass-card${enabled ? '' : ' disabled'}" data-agent="${agent.id}">
         <header><i class="fa-solid ${agent.icon}" aria-hidden="true"></i><div><strong>${escapeHtml(agent.title)}</strong><small>${escapeHtml(agent.description)}</small></div>${toggle}</header>
         ${connection}
+        ${actions}
     </article>`;
 }
 
@@ -75,7 +79,7 @@ export function renderJournal() {
     }).join('') : `<p class="mnema-empty">${escapeHtml(t('Агенты ещё не запускались.'))}</p>`;
 }
 
-export function bindAgentEvents({ getSettings, saveSettings, rerender }) {
+export function bindAgentEvents({ getSettings, saveSettings, rerender, onAction = () => {} }) {
     const update = (id, patch) => {
         const settings = getSettings();
         settings.agents = { ...(settings.agents || {}), [id]: { ...(settings.agents?.[id] || {}), ...patch } };
@@ -89,4 +93,8 @@ export function bindAgentEvents({ getSettings, saveSettings, rerender }) {
     $(document).on('change', '[data-agent-profile]', function () { update(this.dataset.agentProfile, { profileId: this.value }); });
     $(document).on('change', '[data-agent-model]', function () { update(this.dataset.agentModel, { model: this.value.trim() }); });
     $(document).on('click', '#mnema_journal_clear', () => clearJournal());
+    $(document).on('click', '[data-agent-action]', function () {
+        const [agent, action] = String(this.dataset.agentAction).split(':');
+        onAction(agent, action);
+    });
 }

@@ -6,6 +6,7 @@ import { normalizeRelationship, STAGE_UNSET } from './state.js';
 import { escapeHtml } from './utils.js';
 import { t } from './i18n.js';
 import { renderCastPanel } from './cast.js';
+import { renderDirector } from './director.js';
 import { RECAP_KEYS, RECAP_LABELS } from './arc-summary.js';
 import { galleryEnabled } from './gallery-data.js';
 
@@ -92,6 +93,7 @@ export function createRenderer({ getState, getSettings, isProcessing, candidateI
         renderRelationship(state);
         renderGallery(state);
         renderCastPanel(state, settings);
+        renderDirector(state, settings);
     }
     
     function renderScene(state) {

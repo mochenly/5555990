@@ -12,6 +12,19 @@ import { galleryEnabled } from './gallery-data.js';
 // ответа. Отсюда и константа вместо строкового литерала в пяти местах.
 export const STAGE_UNSET = 'Не определено';
 
+// Направления режиссёра: сам режиссёр живёт в director.js, но нормализация
+// нужна состоянию, а импорт оттуда замкнул бы круг через prompts.js.
+export function normalizeDirector(value) {
+    const source = value && typeof value === 'object' ? value : {};
+    return {
+        directions: (Array.isArray(source.directions) ? source.directions : []).map(item => ({
+            hook: String(item?.hook || '').trim().slice(0, 300),
+            why: String(item?.why || '').trim().slice(0, 300),
+        })).filter(item => item.hook).slice(0, 3),
+        at: Number.isFinite(source.at) ? source.at : null,
+    };
+}
+
 export function createState(chat) {
     return {
         version: 8,
@@ -24,6 +37,7 @@ export function createState(chat) {
         relationship: { ladder: [], phase: '', nextStep: '', stage: STAGE_UNSET, behavior: '', progress: 0, trust: 0, passion: 0, devotion: 0, attachment: 0, trends: {}, updatedAt: null },
         gallery: { memories: [], items: [] },
         cast: [],
+        director: { directions: [], at: null },
         world: { location: '', description: '', characterOutfit: '', userOutfit: '', indoor: null, clock: '', clockIndex: null, timeOfDay: '', weather: '', temperature: null, updatedAt: null },
     };
 }
@@ -55,6 +69,7 @@ export function normalizeState(state, chat) {
     state.health.injuries = Array.isArray(state.health.injuries) ? state.health.injuries : [];
     state.relationship = normalizeRelationship(state.relationship);
     state.cast = normalizeCast(state.cast);
+    state.director = normalizeDirector(state.director);
     state.gallery ??= {};
     state.gallery.memories = normalizeGalleryEntries(state.gallery.memories, 'memory');
     state.gallery.items = normalizeGalleryEntries(state.gallery.items, 'item');

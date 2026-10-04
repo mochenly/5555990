@@ -3,6 +3,7 @@ import { infoblockThemesHtml } from './infoblock-themes.js';
 import { gallerySettingsHtml } from './gallery-settings.js';
 import { agentsPanelHtml } from './agents-ui.js';
 import { castPanelHtml } from './cast.js';
+import { directorPanelHtml } from './director.js';
 
 export function menuHtml() {
     return `
@@ -241,6 +242,7 @@ export function popupHtml() {
                                 <div class="mnema-calendar-list-title"><span><i class="fa-solid fa-bandage"></i> Травмы</span><b id="mnema_injury_count">0</b></div>
                                 <div id="mnema_injuries" class="mnema-injury-list"></div>
                             </section>
+                            ${directorPanelHtml()}
                         </section>
                         <section class="mnema-tab-panel" data-mnema-panel="summaries">
                             <div class="mnema-tab-title"><span>✦</span> Арки</div>

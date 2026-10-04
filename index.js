@@ -27,11 +27,13 @@ import {
 import { clampPercent, contiguousRanges, escapeHtml, notify, resolveSurfaceColor } from './modules/utils.js';
 import { isRussianUi, observeTranslation, t, tLang } from './modules/i18n.js';
 import { buildAnalysisPrompt as composeAnalysisPrompt, buildArcPrompt, buildBehaviorPrompt, buildMemoryInjection, buildRouterPrompt, enabledSections, unrecordedSections } from './modules/prompts.js';
-import { callAgent, onJournalChange } from './modules/agents.js';
+import { agentEnabled, callAgent, onJournalChange } from './modules/agents.js';
 import { bindAgentEvents, renderAgentList, renderJournal } from './modules/agents-ui.js';
 import { createReviewer } from './modules/reviewer.js';
 import { applyCastUpdates } from './modules/cast.js';
 import { createArchivist } from './modules/archivist.js';
+import { createDirector } from './modules/director.js';
+import { createJanitor } from './modules/janitor.js';
 import { menuHtml, popupHtml } from './modules/template.js';
 import { applyCalendarUpdates, dateFromIso, formatCalendarDate, renderCalendar, syncCalendarDate } from './modules/calendar.js';
 import { fetchModels, parseJsonResponse, requestModel } from './modules/model-api.js';
@@ -74,6 +76,8 @@ galleryImages = createGalleryImages();
 gallery = createGalleryController({ getState, getSettings: () => settings, images: galleryImages, renderGallery: state => { renderGallery(state); decorateInfoblocks(); }, onChanged: updateArcInjection, isProcessing: () => processing || Boolean(focus.status().busy) });
 gallerySettings = createGallerySettings({ getSettings: () => settings, saveSettings, onChanged: () => renderGallery(getState({ create: false })) });
 const archivist = createArchivist({ getSettings: () => settings, getState });
+const director = createDirector({ getSettings: () => settings, getState, getOpenThreads: state => collectOpenThreads(state).map(thread => thread.text) });
+const janitor = createJanitor({ getSettings: () => settings, getState });
 const reviewer = createReviewer({
     getSettings: () => settings,
     getState,
@@ -861,6 +865,7 @@ async function finalizeArc(chat, state, epoch, { reload = true, silent = false }
     // скрывать по старым значило бы промахнуться мимо цели.
     const consolidated = await consolidateArcs(chat, state, epoch);
     await applyArcVisibility(chat, state);
+    await runArcAgents(chat, state, epoch);
     updateArcInjection();
     if (reload) await reloadCurrentChat();
     if (!silent) {
@@ -869,6 +874,51 @@ async function finalizeArc(chat, state, epoch, { reload = true, silent = false }
         if (consolidated) notify(t('Старые арки слиты в одну: {n}', { n: consolidated.mergeCount }), 'info');
     }
     return arc;
+}
+
+// После закрытия арки: уборщик приводит память в порядок, затем режиссёр
+// смотрит, куда повернуть дальше, — уже по прибранной. Сбой любого из них не
+// должен ронять закрытие арки.
+async function runArcAgents(chat, state, epoch) {
+    let changed = false;
+    for (const [agent, job] of [['janitor', () => janitor.run()], ['director', () => director.run()]]) {
+        if (!agentEnabled(settings, agent)) continue;
+        try {
+            const result = await job();
+            if (Array.isArray(result) ? result.length : result) changed = true;
+        } catch (error) {
+            console.warn(`[Mnema] Агент «${agent}» не справился после арки:`, error);
+        }
+        if (epoch !== chatEpoch || getContext()?.chat !== chat) return;
+    }
+    if (changed) await getContext().saveChat();
+}
+
+async function runAgentAction(agent, action) {
+    if (processing) return notify('Дождитесь завершения анализа', 'info');
+    if (!getState({ create: false })) return notify('Откройте чат', 'info');
+    if (!agentEnabled(settings, agent)) return notify('Сначала включите этого агента во вкладке «Агенты»', 'info');
+    try {
+        if (agent === 'director' && action === 'run') {
+            notify('Режиссёр думает…', 'info');
+            if (await director.run()) { await getContext().saveChat(); notify('Направления обновлены', 'success'); }
+            else notify('Режиссёр ничего не предложил', 'info');
+        }
+        if (agent === 'janitor' && action === 'run') {
+            const done = await janitor.run();
+            if (done.length) { await getContext().saveChat(); notify(t('Уборка: {list}', { list: done.join('; ') }), 'success'); }
+            else notify('Всё и так в порядке', 'info');
+        }
+        if (agent === 'janitor' && action === 'undo') {
+            if (janitor.revert()) { await getContext().saveChat(); notify('Последняя уборка отменена', 'success'); }
+            else notify('Отменять нечего', 'info');
+        }
+    } catch (error) {
+        notify(error.message || String(error), 'error');
+    }
+    updateArcInjection();
+    renderOverview();
+    if (settings.infoblock) decorateInfoblocks();
 }
 
 function updateArcInjection() {
@@ -882,7 +932,10 @@ function updateArcInjection() {
     setExtensionPrompt(PROMPT_KEY, settings.enabled ? arcs : '', extension_prompt_types.IN_PROMPT, 0, false, extension_prompt_roles.SYSTEM);
     // Кто сейчас в сцене, Mnema узнаёт по последним репликам.
     const recentText = chat.slice(-6).filter(message => message && !message.is_system && !message.extra?.mnema_arc_id).map(message => message.mes || '').join('\n');
-    const narrativeContext = settings.enabled ? buildMemoryInjection(state, settings, recentText, { recall: archivist.current() }) : '';
+    const narrativeContext = settings.enabled ? buildMemoryInjection(state, settings, recentText, {
+        recall: archivist.current(),
+        directions: agentEnabled(settings, 'director') ? state?.director?.directions || [] : [],
+    }) : '';
     // Инструкция для основной модели идёт в самый конец чата, сразу после
     // сообщения пользователя, иначе модель про метку забывает.
     setExtensionPrompt(
@@ -1345,7 +1398,7 @@ async function refreshCalendarFromChat() {
 
 function bindEvents() {
     sectionEditor.bindEvents();
-    bindAgentEvents({ getSettings: () => settings, saveSettings, rerender: () => renderAgentList(settings, getProfiles()) });
+    bindAgentEvents({ getSettings: () => settings, saveSettings, rerender: () => { renderAgentList(settings, getProfiles()); renderOverview(); updateArcInjection(); }, onAction: (agent, action) => void runAgentAction(agent, action) });
     reviewer.bindEvents();
     gallery.bindEvents();
     gallerySettings.bindEvents();
