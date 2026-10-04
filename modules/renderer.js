@@ -127,8 +127,13 @@ export function createRenderer({ getState, getSettings, isProcessing, candidateI
             }
             $('#mnema_overview_relationship_stage').text(relationship.stage);
             $('#mnema_overview_relationship_fill').css('width', `${relationship.progress}%`);
-            const rung = (relationship.ladder || []).find(item => item.id === relationship.phase);
-            $('#mnema_overview_relationship_value').text([rung?.title, t('{n}% общего прогресса', { n: relationship.progress })].filter(Boolean).join(' · '));
+            // Название ступени уже стоит заголовком над полосой: под ней —
+            // то, чего там нет, — сколько пройдено и какая ступень следующая.
+            const ladder = relationship.ladder || [];
+            const next = ladder[ladder.findIndex(item => item.id === relationship.phase) + 1];
+            $('#mnema_overview_relationship_value').text(next
+                ? t('{n}% общего прогресса · дальше: {next}', { n: relationship.progress, next: next.title })
+                : t('{n}% общего прогресса', { n: relationship.progress }));
         }
     
         const secrets = state?.secrets;

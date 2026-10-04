@@ -1382,6 +1382,10 @@ body.mnema-popup-open { overflow: hidden; }
 
 .mnema-field {
     display: grid;
+    /* К верху: строка полей растягивает ячейки до самой длинной подсказки, и
+       без этого лишняя высота делилась между подписью и полем — поля соседних
+       колонок вставали на разную высоту. */
+    align-content: start;
     gap: 6px;
     color: var(--mnema-muted);
     font-size: 11px;
