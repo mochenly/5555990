@@ -11,6 +11,7 @@
 - `model-api.js` — Connection Manager and manual Extra API transport.
 - `agents.js` — agent registry, per-agent connection override and the session journal; `callAgent` is the only way agents reach the model.
 - `agents-ui.js` — the Agents tab: analysis mode, per-agent switches and connections, journal.
+- `reviewer.js` — the Editor agent: checks the newest reply against memory, marks contradictions under it and rewrites it as a new swipe with a one-off correction.
 - `config.js` — identifiers, defaults and shared feature metadata.
 - `utils.js` — small DOM-safe helpers.
 

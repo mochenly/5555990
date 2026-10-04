@@ -18,6 +18,7 @@ export const AGENTS = Object.freeze([
     { id: 'behavior', kind: 'section', section: 'trackRelationships', icon: 'fa-masks-theater', title: 'Поведение', description: 'Пишет, как персонажу держаться с собеседником, из его характера и уровней отношений. Чата не видит намеренно, чтобы не списывать с него' },
     { id: 'secrets', kind: 'section', section: 'trackSecrets', icon: 'fa-key', title: 'Хранитель тайн', description: 'Секреты, их раскрытие и от кого они скрыты' },
     { id: 'gallery', kind: 'section', section: 'collectGallery', icon: 'fa-images', title: 'Галерея', description: 'Важные воспоминания и памятные предметы' },
+    { id: 'editor', kind: 'optional', icon: 'fa-feather-pointed', title: 'Редактор', description: 'Сверяет каждый новый ответ с памятью и прошлыми сообщениями и отмечает противоречия под ответом; по кнопке переписывает его с поправкой. Один запрос на каждый ответ' },
     { id: 'arcs', kind: 'core', icon: 'fa-book-open', title: 'Летописец арок', description: 'Сводит конспекты закончившейся арки в одну сводку и сливает старые арки' },
 ]);
 

@@ -29,6 +29,7 @@ import { isRussianUi, observeTranslation, t, tLang } from './modules/i18n.js';
 import { buildAnalysisPrompt as composeAnalysisPrompt, buildArcPrompt, buildBehaviorPrompt, buildMemoryInjection, buildRouterPrompt, enabledSections, unrecordedSections } from './modules/prompts.js';
 import { callAgent, onJournalChange } from './modules/agents.js';
 import { bindAgentEvents, renderAgentList, renderJournal } from './modules/agents-ui.js';
+import { createReviewer } from './modules/reviewer.js';
 import { menuHtml, popupHtml } from './modules/template.js';
 import { applyCalendarUpdates, dateFromIso, formatCalendarDate, renderCalendar, syncCalendarDate } from './modules/calendar.js';
 import { fetchModels, parseJsonResponse, requestModel } from './modules/model-api.js';
@@ -70,6 +71,12 @@ const { getParticipantVisuals, renderGallery, renderOverview, setSecretPeek, isP
 galleryImages = createGalleryImages();
 gallery = createGalleryController({ getState, getSettings: () => settings, images: galleryImages, renderGallery: state => { renderGallery(state); decorateInfoblocks(); }, onChanged: updateArcInjection, isProcessing: () => processing || Boolean(focus.status().busy) });
 gallerySettings = createGallerySettings({ getSettings: () => settings, saveSettings, onChanged: () => renderGallery(getState({ create: false })) });
+const reviewer = createReviewer({
+    getSettings: () => settings,
+    getState,
+    isGenerating: () => isGenerating(),
+    isBusy: () => false,
+});
 // Фокусная генерация раздела: секреты и планы по отдельной кнопке, без общего
 // анализа. Перерисовываем всё, чего она касается, — попап и плашку в чате.
 const focus = createFocusController({
@@ -1331,6 +1338,7 @@ async function refreshCalendarFromChat() {
 function bindEvents() {
     sectionEditor.bindEvents();
     bindAgentEvents({ getSettings: () => settings, saveSettings, rerender: () => renderAgentList(settings, getProfiles()) });
+    reviewer.bindEvents();
     gallery.bindEvents();
     gallerySettings.bindEvents();
     $(document).on('click', `#${MENU_BUTTON_ID}`, openPopup);
@@ -1536,6 +1544,7 @@ async function onChatChanged() {
     renderOverview();
     setTimeout(decorateArcMessages, 0);
     setTimeout(decorateInfoblocks, 0);
+    setTimeout(reviewer.decorate, 60);
     scheduleSceneTag(null, 0);
     // Чат мог быть сохранён с непойманными метками — подбираем их при открытии.
     setTimeout(() => sweepSceneTags(), 300);
@@ -1562,6 +1571,9 @@ function initialize() {
         if (settings.enabled) setTimeout(() => void processAvailable(), 300);
         // Фоновая дописка чужого расширения приходит уже после нашего разбора.
         setTimeout(() => sweepSceneTags(), 2000);
+        // Редактор ждёт, пока метка сцены разобрана и вырезана: иначе он
+        // проверил бы текст, которого в чате уже не будет.
+        setTimeout(() => void reviewer.review(Number(messageId)), 1500);
     });
     // Слушатель намеренно блокирующий: Generate() ждёт MESSAGE_SENT, поэтому
     // сообщение уходит уже после того, как память заполнена.
@@ -1571,14 +1583,18 @@ function initialize() {
         // Reparse local metadata too: edited replies may contain a fresh tag.
         if (settings.infoblock) scheduleSceneTag(messageId);
         setTimeout(() => void refreshCalendarFromChat(), 100);
+        setTimeout(reviewer.decorate, 60);
     });
-    eventSource.on(event_types.MESSAGE_SWIPED, () => { scheduleSceneTag(); setTimeout(decorateInfoblocks, 50); setTimeout(() => sweepSceneTags(), 2000); });
+    eventSource.on(event_types.MESSAGE_SWIPED, () => { scheduleSceneTag(); setTimeout(decorateInfoblocks, 50); setTimeout(reviewer.decorate, 60); setTimeout(() => sweepSceneTags(), 2000); });
     // GENERATION_ENDED passes chat.length, not a message index.
-    eventSource.on(event_types.GENERATION_ENDED, () => scheduleSceneTag());
+    eventSource.on(event_types.GENERATION_ENDED, () => { reviewer.clearCorrection(); scheduleSceneTag(); });
+    // Разовая поправка редактора не должна пережить остановленную генерацию.
+    if (event_types.GENERATION_STOPPED) eventSource.on(event_types.GENERATION_STOPPED, () => reviewer.clearCorrection());
     eventSource.on(event_types.MESSAGE_DELETED, () => {
         const state = getState({ create: false });
         if (state) normalizeState(state, getContext().chat);
         updateArcInjection(); renderOverview();
+        setTimeout(reviewer.decorate, 60);
     });
     eventSource.on(event_types.GENERATION_STARTED, updateArcInjection);
     console.log('[Mnema] initialized');
