@@ -122,6 +122,13 @@ function loadSettings() {
     settings = extension_settings[EXTENSION_KEY];
     delete settings.temperature;
     settings.infoblockTheme = infoblockTheme(settings.infoblockTheme);
+    // Поведение было отдельным агентом: его подключение переезжает к агенту
+    // отношений, если там своего не задано.
+    if (settings.agents?.behavior) {
+        const { behavior, ...rest } = settings.agents;
+        const relationship = rest.relationship || {};
+        settings.agents = { ...rest, relationship: { ...relationship, profileId: relationship.profileId || behavior.profileId || '', model: relationship.model || behavior.model || '' } };
+    }
     initializeGallerySettings(settings);
     saveSettingsDebounced();
 }
@@ -562,7 +569,8 @@ async function refreshBehavior(chat, state, epoch) {
             userName: context?.name1,
             languageSource: serializeMessages(chat, recent),
         });
-        const result = await callAgent('behavior', messages, settings, 800);
+        // Второй шаг агента отношений — тот же агент и то же подключение.
+        const result = await callAgent('relationship', messages, settings, 800, { describe: () => t('Шаг 2: поведение переписано') });
         if (epoch !== chatEpoch || getContext()?.chat !== chat) return false;
         const behavior = String(result.behavior || '').trim().slice(0, 900);
         if (!behavior) return false;

@@ -14,8 +14,11 @@ export const AGENTS = Object.freeze([
     { id: 'world', kind: 'core', icon: 'fa-earth-europe', title: 'Летописец мира', description: 'Место, время, погода и одежда героев' },
     { id: 'calendar', kind: 'section', section: 'trackCalendar', icon: 'fa-calendar', title: 'Календарь', description: 'Сюжетная дата, дни рождения и планы' },
     { id: 'health', kind: 'section', section: 'trackHealth', icon: 'fa-notes-medical', title: 'Здоровье', description: 'Сытость, энергия, настроение и травмы персонажа' },
-    { id: 'relationship', kind: 'section', section: 'trackRelationships', icon: 'fa-heart', title: 'Отношения', description: 'Лестница отношений и шкалы' },
-    { id: 'behavior', kind: 'section', section: 'trackRelationships', icon: 'fa-masks-theater', title: 'Поведение', description: 'Пишет, как персонажу держаться с собеседником, из его характера и уровней отношений. Чата не видит намеренно, чтобы не списывать с него' },
+    // Один агент, два шага: сначала по интервалу обновляет лестницу и шкалы,
+    // потом, если уровни заметно сдвинулись, пишет поведение — уже не глядя в
+    // чат. Слить шаги в один запрос нельзя: модель, только что прочитавшая
+    // сцену, описывает её вместо того, чтобы задавать поведение.
+    { id: 'relationship', kind: 'section', section: 'trackRelationships', icon: 'fa-heart', title: 'Отношения', description: 'Лестница отношений, шкалы и поведение персонажа. Поведение пишет вторым шагом и уже без чата — из характера и уровней, чтобы не списывать с последних сцен; переписывает, только когда уровни заметно сдвинулись' },
     { id: 'secrets', kind: 'section', section: 'trackSecrets', icon: 'fa-key', title: 'Хранитель тайн', description: 'Секреты, их раскрытие и от кого они скрыты' },
     { id: 'gallery', kind: 'section', section: 'collectGallery', icon: 'fa-images', title: 'Галерея', description: 'Важные воспоминания и памятные предметы' },
     { id: 'editor', kind: 'optional', icon: 'fa-feather-pointed', title: 'Редактор', description: 'Сверяет каждый новый ответ с памятью и прошлыми сообщениями и отмечает противоречия под ответом; по кнопке переписывает его с поправкой. Один запрос на каждый ответ' },
