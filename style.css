@@ -2264,3 +2264,10 @@ html body #chat .mnema-arc-fold {
 .mnema-debug-row.error i, .mnema-debug-row.error span { color: #e07a6a; }
 .mnema-debug-row.request i, .mnema-debug-row.response i { color: var(--mnema-accent); }
 .mnema-debug-row pre { margin: 0; padding: 6px 10px 8px 30px; max-height: 300px; overflow: auto; white-space: pre-wrap; font-size: 10.5px; opacity: 0.85; }
+
+/* Полосы прокрутки в окне Mnema не показываем: прокрутка колесом, тачпадом и
+   пальцем остаётся, пропадают только сами полосы. */
+#mnema_popup,
+#mnema_popup * { scrollbar-width: none; }
+#mnema_popup::-webkit-scrollbar,
+#mnema_popup *::-webkit-scrollbar { display: none; width: 0; height: 0; }
