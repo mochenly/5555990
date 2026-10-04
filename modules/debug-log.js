@@ -88,11 +88,15 @@ const time = at => {
 // Выгрузка — то, что пользователь пришлёт разработчику. Ключ API туда не
 // попадает ни в каком виде.
 export function debugReport({ settings = {}, version = '', extra = {} } = {}) {
-    const { apiKey, ...safe } = settings || {};
+    // Ключи прячем на любой глубине: у агентов бывают свои.
+    const redact = value => Array.isArray(value) ? value.map(redact)
+        : value && typeof value === 'object'
+            ? Object.fromEntries(Object.entries(value).map(([key, item]) => [key, /apikey/i.test(key) ? (item ? '(set, hidden)' : '') : redact(item)]))
+            : value;
     const header = [
         `Mnema ${version} — debug log, ${new Date().toISOString()}`,
         `User agent: ${navigator.userAgent}`,
-        `Settings: ${stringify({ ...safe, apiKey: apiKey ? '(set, hidden)' : '' })}`,
+        `Settings: ${stringify(redact(settings || {}))}`,
         ...Object.entries(extra).map(([key, value]) => `${key}: ${stringify(value)}`),
         '',
     ];

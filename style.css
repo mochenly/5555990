@@ -2170,17 +2170,42 @@ html body #chat .mnema-arc-fold {
     .mnema-ib[data-ib-theme] *, .mnema-ib-theme-card { transition: none !important; animation: none !important; }
 }
 /* ---------- Агенты ---------- */
-.mnema-agent-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin: 12px 0; }
-.mnema-agent { display: flex; flex-direction: column; gap: 8px; padding: 12px; }
-.mnema-agent.disabled { opacity: 0.55; }
-.mnema-agent header { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 8px; align-items: start; }
-.mnema-agent header > i { color: var(--mnema-accent); font-size: 15px; margin-top: 2px; }
-.mnema-agent header strong { display: block; font-size: 12px; }
-.mnema-agent header small { display: block; color: var(--mnema-muted); font-size: 10.5px; line-height: 1.45; margin-top: 2px; }
-.mnema-agent .mnema-field { margin: 0; font-size: 11px; }
+.mnema-agent-list { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 12px; }
+.mnema-agent { padding: 0; overflow: hidden; transition: border-color 160ms ease; }
+.mnema-agent.disabled > summary { opacity: 0.6; }
+.mnema-agent[open] { border-color: color-mix(in srgb, var(--mnema-accent) 40%, transparent); }
+.mnema-agent > summary { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto auto 14px; gap: 10px; align-items: center; padding: 10px 12px; cursor: pointer; list-style: none; }
+.mnema-agent > summary::-webkit-details-marker { display: none; }
+.mnema-agent > summary:hover { background: color-mix(in srgb, var(--mnema-accent) 6%, transparent); }
+.mnema-agent-icon { color: var(--mnema-accent); font-size: 15px; text-align: center; }
+.mnema-agent-name { min-width: 0; }
+.mnema-agent-name strong { display: block; font-size: 12px; }
+.mnema-agent-name small { display: block; color: var(--mnema-muted); font-size: 10.5px; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mnema-agent[open] .mnema-agent-name small { white-space: normal; }
+.mnema-agent-chevron { color: var(--mnema-muted); font-size: 11px; transition: transform 160ms ease; }
+.mnema-agent[open] .mnema-agent-chevron { transform: rotate(180deg); }
+.mnema-agent-chip { display: inline-flex; align-items: center; gap: 5px; max-width: 160px; font-size: 10px; padding: 2px 8px; border-radius: 99px; background: color-mix(in srgb, var(--mnema-accent) 12%, transparent); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mnema-agent-chip i { color: var(--mnema-accent); font-size: 9px; }
 .mnema-agent-badge { font-size: 10px; padding: 2px 7px; border-radius: 99px; white-space: nowrap; color: var(--mnema-accent); border: 1px solid color-mix(in srgb, var(--mnema-accent) 35%, transparent); }
 .mnema-agent-badge.off { color: var(--mnema-muted); border-color: color-mix(in srgb, var(--mnema-muted) 35%, transparent); }
-.mnema-agent-switch { display: flex; align-items: center; gap: 5px; font-size: 10.5px; white-space: nowrap; cursor: pointer; }
+.mnema-agent-body { display: flex; flex-direction: column; gap: 10px; padding: 4px 14px 14px 44px; border-top: 1px solid color-mix(in srgb, var(--mnema-muted) 15%, transparent); }
+.mnema-agent-body h5 { margin: 6px 0 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--mnema-muted); }
+.mnema-agent-body .mnema-field { margin: 0; font-size: 11px; }
+.mnema-agent-body .mnema-hint { margin: 0; }
+.mnema-agent-toggle { margin-top: 8px; }
+.mnema-agent-modes { display: flex; flex-wrap: wrap; gap: 4px; padding: 3px; border-radius: 10px; background: #0002; width: fit-content; }
+.mnema-agent-mode { position: relative; cursor: pointer; }
+.mnema-agent-mode input { position: absolute; opacity: 0; pointer-events: none; }
+.mnema-agent-mode span { display: block; padding: 4px 12px; border-radius: 8px; font-size: 11px; color: var(--mnema-muted); transition: background 140ms ease, color 140ms ease; }
+.mnema-agent-mode.active span { background: color-mix(in srgb, var(--mnema-accent) 22%, transparent); color: inherit; }
+.mnema-agent-mode input:focus-visible + span { outline: 1px solid var(--mnema-accent); }
+.mnema-agent-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.mnema-agent-actions .menu_button { width: auto; margin: 0; padding: 4px 10px; font-size: 11px; }
+@media (max-width: 560px) {
+    .mnema-agent > summary { grid-template-columns: 22px minmax(0, 1fr) auto 14px; }
+    .mnema-agent-chip { display: none; }
+    .mnema-agent-body { padding-left: 14px; }
+}
 .mnema-journal { display: flex; flex-direction: column; gap: 4px; max-height: 360px; overflow-y: auto; }
 .mnema-journal-row { display: grid; grid-template-columns: 14px auto minmax(0, 1fr) auto; gap: 8px; align-items: baseline; padding: 5px 8px; border-radius: 8px; background: #0001; font-size: 11px; }
 .mnema-journal-row > i { color: var(--mnema-accent); }
@@ -2217,8 +2242,6 @@ html body #chat .mnema-arc-fold {
 .mnema-cast-knows em i { font-size: 8px; color: var(--mnema-accent); }
 
 /* ---------- Режиссёр и действия агентов ---------- */
-.mnema-agent-actions { display: flex; flex-wrap: wrap; gap: 6px; }
-.mnema-agent-actions .menu_button { width: auto; margin: 0; padding: 4px 10px; font-size: 11px; }
 .mnema-director { margin-top: 12px; padding: 12px 14px; }
 .mnema-director h4 i { color: var(--mnema-accent); margin-right: 4px; }
 .mnema-director ol { margin: 8px 0 0; padding-left: 20px; }

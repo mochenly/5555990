@@ -39,16 +39,48 @@ export function agentEnabled(settings, id) {
     return Boolean(settings?.agents?.[id]?.enabled);
 }
 
-// Своё подключение у агента — только замена профиля или модели поверх общих
-// настроек: распорядителю хватает дешёвой быстрой модели, редактору нужна
-// внимательная. Пустое значение — «как основное».
+// Своё подключение у агента: распорядителю хватает дешёвой быстрой модели,
+// редактору нужна внимательная, а кому-то удобнее отдельный ключ. Три режима,
+// независимо от основного:
+//   ''       — как основное подключение Mnema;
+//   profile  — профиль подключения SillyTavern;
+//   manual   — свой адрес API, ключ и модель. Пустой адрес или ключ берутся
+//              из основных ручных настроек, модель — своя обязательно.
+export function agentConnectionMode(settings, id) {
+    const own = settings?.agents?.[id] || {};
+    if (own.mode === 'profile' || own.mode === 'manual' || own.mode === '') return own.mode;
+    // Настройки до появления режимов: был только профиль или только модель.
+    if (own.profileId) return 'profile';
+    if (own.model && settings?.connectionMode === 'manual') return 'manual';
+    return '';
+}
+
 export function agentSettings(settings, id) {
     const own = settings?.agents?.[id] || {};
-    return {
-        ...settings,
-        profileId: String(own.profileId || '').trim() || settings.profileId,
-        model: String(own.model || '').trim() || settings.model,
-    };
+    const mode = agentConnectionMode(settings, id);
+    if (mode === 'profile') return { ...settings, connectionMode: 'profile', profileId: String(own.profileId || '').trim() || settings.profileId };
+    if (mode === 'manual') {
+        return {
+            ...settings,
+            connectionMode: 'manual',
+            apiUrl: String(own.apiUrl || '').trim() || settings.apiUrl,
+            apiKey: String(own.apiKey || '').trim() || settings.apiKey,
+            model: String(own.model || '').trim() || settings.model,
+        };
+    }
+    return settings;
+}
+
+// Короткая подпись подключения для свёрнутой карточки.
+export function agentConnectionLabel(settings, id, profiles = []) {
+    const mode = agentConnectionMode(settings, id);
+    const resolved = agentSettings(settings, id);
+    if (mode === 'profile') {
+        const profile = profiles.find(item => item.id === resolved.profileId);
+        return { mode, text: profile?.name || profile?.model || resolved.profileId || '—' };
+    }
+    if (mode === 'manual') return { mode, text: resolved.model || '—' };
+    return { mode, text: '' };
 }
 
 // Журнал живёт только в памяти сессии: он нужен, чтобы видеть, кто и сколько
